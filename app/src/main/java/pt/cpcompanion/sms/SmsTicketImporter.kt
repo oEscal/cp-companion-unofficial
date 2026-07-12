@@ -26,6 +26,7 @@ class SmsTicketImporter(
     fun importInbox(
         stations: List<Station>,
         stopAtMessageId: String? = null,
+        stopAtReceivedAtEpochMillis: Long? = null,
         maxMessages: Int = 2_000,
     ): SmsImportResult {
         check(
@@ -47,11 +48,29 @@ class SmsTicketImporter(
         val sort = "${Telephony.TextBasedSmsColumns.DATE} DESC"
 
         val numericCheckpoint = stopAtMessageId?.toLongOrNull()
+        val selection = when {
+            stopAtReceivedAtEpochMillis != null && numericCheckpoint != null ->
+                "(${Telephony.TextBasedSmsColumns.DATE} > ?) OR " +
+                    "(${Telephony.TextBasedSmsColumns.DATE} = ? AND ${BaseColumns._ID} > ?)"
+            stopAtReceivedAtEpochMillis != null -> "${Telephony.TextBasedSmsColumns.DATE} > ?"
+            numericCheckpoint != null -> "${BaseColumns._ID} > ?"
+            else -> null
+        }
+        val selectionArgs = when {
+            stopAtReceivedAtEpochMillis != null && numericCheckpoint != null -> arrayOf(
+                stopAtReceivedAtEpochMillis.toString(),
+                stopAtReceivedAtEpochMillis.toString(),
+                numericCheckpoint.toString(),
+            )
+            stopAtReceivedAtEpochMillis != null -> arrayOf(stopAtReceivedAtEpochMillis.toString())
+            numericCheckpoint != null -> arrayOf(numericCheckpoint.toString())
+            else -> null
+        }
         appContext.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
             projection,
-            numericCheckpoint?.let { "${BaseColumns._ID} > ?" },
-            numericCheckpoint?.let { arrayOf(it.toString()) },
+            selection,
+            selectionArgs,
             sort,
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(BaseColumns._ID)
@@ -74,6 +93,7 @@ class SmsTicketImporter(
         }
         return importMessages(messages, stations).copy(
             newestScannedInboxMessageId = messages.firstOrNull()?.id,
+            newestScannedInboxReceivedAtEpochMillis = messages.firstOrNull()?.receivedAtEpochMillis,
         )
     }
 
@@ -114,9 +134,9 @@ class SmsTicketImporter(
 
     fun resolveTicketStations(ticket: Ticket, stations: List<Station>): Ticket {
         if (ticket.originStationCode.isNotBlank() && ticket.destinationStationCode.isNotBlank()) return ticket
-        val stationIndex = stations.groupBy { normalizeStationName(it.name) }
-        val origin = ticket.originName?.let { stationIndex[normalizeStationName(it)]?.singleOrNull() }
-        val destination = ticket.destinationName?.let { stationIndex[normalizeStationName(it)]?.singleOrNull() }
+        val stationIndex = stationIndex(stations)
+        val origin = ticket.originName?.let { stationIndex[normalizeStationName(it)]?.distinctBy(Station::code)?.singleOrNull() }
+        val destination = ticket.destinationName?.let { stationIndex[normalizeStationName(it)]?.distinctBy(Station::code)?.singleOrNull() }
         return ticket.copy(
             originStationCode = ticket.originStationCode.ifBlank { origin?.code.orEmpty() },
             destinationStationCode = ticket.destinationStationCode.ifBlank { destination?.code.orEmpty() },
@@ -126,7 +146,7 @@ class SmsTicketImporter(
     }
 
     private fun importMessages(messages: List<SmsSourceMessage>, stations: List<Station>): SmsImportResult {
-        val stationIndex = stations.groupBy { normalizeStationName(it.name) }
+        val stationIndex = stationIndex(stations)
         val tickets = mutableListOf<Ticket>()
         val issues = mutableListOf<String>()
         var candidates = 0
@@ -137,8 +157,8 @@ class SmsTicketImporter(
             if (!isCpSender(source.sender) && !hasCpTicketMarkers(source.body)) return@forEach
             candidates += 1
             parsed.legs.forEach { leg ->
-                val origin = stationIndex[normalizeStationName(leg.originName)]?.singleOrNull()
-                val destination = stationIndex[normalizeStationName(leg.destinationName)]?.singleOrNull()
+                val origin = stationIndex[normalizeStationName(leg.originName)]?.distinctBy(Station::code)?.singleOrNull()
+                val destination = stationIndex[normalizeStationName(leg.destinationName)]?.distinctBy(Station::code)?.singleOrNull()
                 if (origin == null || destination == null) {
                     val unresolved = buildList {
                         if (origin == null) add(leg.originName)
@@ -250,12 +270,32 @@ class SmsTicketImporter(
     private fun stableId(text: String): String =
         UUID.nameUUIDFromBytes(text.toByteArray(StandardCharsets.UTF_8)).toString()
 
-    private fun normalizeStationName(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "")
-        .lowercase()
-        .replace(Regex("[^a-z0-9]+"), " ")
-        .trim()
-        .replace(Regex("\\s+"), " ")
+    private fun stationIndex(stations: List<Station>): Map<String, List<Station>> = stations
+        .flatMap { station -> stationAliases(station.name).map { alias -> alias to station } }
+        .groupBy({ it.first }, { it.second })
+
+    private fun stationAliases(name: String): Set<String> {
+        val normalized = normalizeStationName(name)
+        val withoutSuffix = normalized
+            .removeSuffix(" estacao")
+            .removeSuffix(" station")
+            .removeSuffix(" gare")
+            .trim()
+        val reverseAliases = CURATED_STATION_ALIASES
+            .filterValues { it == normalized }
+            .keys
+        return (setOf(normalized, withoutSuffix) + reverseAliases).filter(String::isNotBlank).toSet()
+    }
+
+    private fun normalizeStationName(value: String): String {
+        val normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}+"), "")
+            .lowercase()
+            .replace(Regex("[^a-z0-9]+"), " ")
+            .trim()
+            .replace(Regex("\\s+"), " ")
+        return CURATED_STATION_ALIASES[normalized] ?: normalized
+    }
 
     private data class SmsSourceMessage(
         val id: String,
@@ -268,6 +308,13 @@ class SmsTicketImporter(
     private companion object {
         const val CP_SENDER = "CP"
         val CP_TIME_ZONE: ZoneId = ZoneId.of("Europe/Lisbon")
+        val CURATED_STATION_ALIASES = mapOf(
+            "oriente" to "lisboa oriente",
+            "santa apolonia" to "lisboa santa apolonia",
+            "campanha" to "porto campanha",
+            "coimbra b" to "coimbra b",
+            "coimbra-b" to "coimbra b",
+        )
     }
 }
 
@@ -277,13 +324,14 @@ data class SmsImportResult(
     val tickets: List<Ticket>,
     val issues: List<String>,
     val newestScannedInboxMessageId: String? = null,
+    val newestScannedInboxReceivedAtEpochMillis: Long? = null,
 ) {
     val newestImportedInboxMessageId: String? = tickets
         .asSequence()
         .filter { it.source == TicketSource.SMS_INBOX }
-        .mapNotNull { it.sourceMessageId }
+        .maxByOrNull { it.createdAtEpochMillis }
+        ?.sourceMessageId
         // Multipart candidates use a synthetic "oldest+…+newest" ID. The
         // newest physical SMS is the cursor checkpoint for the next scan.
-        .map { it.substringAfterLast('+') }
-        .firstOrNull()
+        ?.substringAfterLast('+')
 }

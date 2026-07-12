@@ -1,5 +1,8 @@
 package pt.cpcompanion.sms
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -21,10 +24,12 @@ import pt.cpcompanion.MainActivity
 import pt.cpcompanion.R
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.notifications.TrackingNotificationFactory
-import pt.cpcompanion.worker.TicketReminderScheduler
+import pt.cpcompanion.automation.TicketAutomationReconciler
+import pt.cpcompanion.automation.TicketValidationCoordinator
 
 class CpSmsNotificationListener : NotificationListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val processingFingerprints = LinkedHashSet<String>()
 
     override fun onCreate() {
         super.onCreate()
@@ -40,22 +45,44 @@ class CpSmsNotificationListener : NotificationListenerService() {
         if (sbn.packageName == packageName) return
         val notification = sbn.notification
         if (notification.category != null && notification.category != Notification.CATEGORY_MESSAGE) return
-        val sender = extractSender(notification) ?: return
-        if (!isCpSender(sender)) return
         val body = extractBody(notification) ?: return
+        val sender = extractSender(notification).orEmpty()
+        if (!isCpSender(sender) && !hasStrongCpTicketMarkers(body)) return
 
         scope.launch {
             val container = (application as TrainTrackerApplication).container
-            val result = container.smsTicketImporter.importNotificationText(
-                text = body,
-                stations = container.repository.cachedStations(),
-                notificationKey = sbn.key,
-                receivedAtEpochMillis = sbn.postTime,
-            )
-            if (result.tickets.isEmpty()) return@launch
-            result.tickets.forEach { ticket ->
-                container.stores.upsertTicket(ticket)
-                TicketReminderScheduler.schedule(applicationContext, ticket)
+            container.stores.awaitReady()
+            val fingerprint = container.stores.notificationFingerprint(sbn.packageName, sbn.key, body)
+            synchronized(processingFingerprints) {
+                if (container.stores.wasNotificationImportProcessed(fingerprint) ||
+                    !processingFingerprints.add(fingerprint)
+                ) return@launch
+            }
+            try {
+                val result = container.smsTicketImporter.importNotificationText(
+                    text = body,
+                    stations = container.repository.cachedStations(),
+                    notificationKey = sbn.key,
+                    receivedAtEpochMillis = sbn.postTime,
+                )
+                if (result.tickets.isEmpty()) return@launch
+                var changedCount = 0
+                var firstChangedTicketId: String? = null
+                result.tickets.forEach { ticket ->
+                    val upsert = container.stores.upsertImportedTicket(ticket)
+                    if (upsert.changed) {
+                        changedCount += 1
+                        if (firstChangedTicketId == null) firstChangedTicketId = upsert.ticket.id
+                    }
+                    if (upsert.requiresValidation) {
+                        val outcome = TicketValidationCoordinator.validateAndSchedule(applicationContext, upsert.ticket)
+                        if (outcome.shouldRetry) TicketAutomationReconciler.enqueue(applicationContext)
+                    }
+                }
+                container.stores.markNotificationImportProcessed(fingerprint)
+                firstChangedTicketId?.let { postImportNotification(changedCount, it) }
+            } finally {
+                synchronized(processingFingerprints) { processingFingerprints.remove(fingerprint) }
             }
         }
     }
@@ -68,12 +95,7 @@ class CpSmsNotificationListener : NotificationListenerService() {
     private fun extractSender(notification: Notification): String? {
         val extras = notification.extras
         val lastMessage = extractMessagingMessages(notification).lastOrNull()
-        @Suppress("DEPRECATION")
-        val messageSender = if (Build.VERSION.SDK_INT >= 28) {
-            lastMessage?.senderPerson?.name?.toString()
-        } else {
-            lastMessage?.sender?.toString()
-        }
+        val messageSender = lastMessage?.senderPerson?.name?.toString()
         return messageSender
             ?: extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
@@ -105,7 +127,18 @@ class CpSmsNotificationListener : NotificationListenerService() {
     }
 
     private fun postImportNotification(count: Int, ticketId: String) {
-        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        val notificationManager = NotificationManagerCompat.from(this)
+        if (!notificationManager.areNotificationsEnabled()) return
         val openIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(TrackingNotificationFactory.EXTRA_TICKET_ID, ticketId)
@@ -118,27 +151,38 @@ class CpSmsNotificationListener : NotificationListenerService() {
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_ticket)
-            .setContentTitle(if (count == 1) "CP ticket imported" else "$count CP ticket legs imported")
-            .setContentText("Open CP Companion to review the trip details and start tracking.")
+            .setContentTitle(resources.getQuantityString(R.plurals.notification_import_count, count, count))
+            .setContentText(getString(R.string.notification_sms_imported_body))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .build()
-        NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
+        try {
+            notificationManager.notify(NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // Permission or notification policy changed between the check and notify().
+        }
     }
 
     private fun createChannel() {
-        if (Build.VERSION.SDK_INT < 26) return
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Ticket imports",
+                getString(R.string.ticket_import_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = "Confirmation after a CP ticket SMS is imported"
+                description = getString(R.string.ticket_import_channel_description)
             },
         )
+    }
+
+
+    private fun hasStrongCpTicketMarkers(body: String): Boolean {
+        val value = normalize(body)
+        val hasTicket = value.contains("bilhete") || value.contains("reserva") || value.contains("ticket")
+        val hasJourney = value.contains("comboio") && (value.contains("ida") || value.contains("volta") || value.contains("partida"))
+        return hasTicket && hasJourney
     }
 
     private fun isCpSender(value: String): Boolean {

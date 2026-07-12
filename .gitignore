@@ -1,12 +1,107 @@
-*.iml
+# Gradle
 .gradle/
-/local.properties
-/.idea/
-.DS_Store
-/build/
 **/build/
-/captures/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local Android SDK configuration
+local.properties
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Kotlin
+.kotlin/
+*.kotlin_module
+
+# Android generated files
+captures/
 .externalNativeBuild/
 .cxx/
+.navigation/
+lint-results*.html
+lint-results*.xml
+lint-results*.txt
+
+# APKs, App Bundles, mapping and native symbols
+*.apk
+*.apks
+*.aab
+*.aar
+*.mapping
+mapping.txt
+native-debug-symbols.zip
+
+# Signing credentials and keystores
 *.jks
 *.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+
+# Release credential files
+release.properties
+secrets.properties
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test and coverage output
+coverage/
+test-results/
+connected-results/
+reports/
+*.ec
+*.exec
+
+# Baseline profiles and generated benchmark output
+**/generated/baselineProfiles/
+**/benchmarkData/
+**/additional_test_output/
+
+# Firebase / Google service configuration
+# Remove these entries if the files are intentionally committed.
+google-services.json
+GoogleService-Info.plist
+
+# Fastlane generated files
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Local databases and application data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Archives created for delivery
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Local project notes
+PLAN.md
+
+# Keep Room schema exports under version control when configured.
+!app/schemas/
+!app/schemas/**
