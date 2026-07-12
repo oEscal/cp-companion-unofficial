@@ -392,7 +392,11 @@ private fun UpcomingHero(ticket: Ticket?, navigate: (AppScreen) -> Unit, startTr
                 Text("Next saved trip", style = MaterialTheme.typography.labelLarge)
                 Text("${ticket.serviceLabel ?: "Train"} ${ticket.trainNumber}", style = MaterialTheme.typography.displaySmall)
                 Text("${ticket.originName ?: ticket.originStationCode} → ${ticket.destinationName ?: ticket.destinationStationCode}")
-                Text(ticket.serviceDate, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f))
+                Text(
+                    listOfNotNull(ticket.serviceDate, ticket.departureTimingLabel())
+                        .joinToString(" · "),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f),
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { startTracking(ticket) }) { Text("Track train") }
                     OutlinedButton(
@@ -1180,9 +1184,10 @@ private fun TicketCard(ticket: Ticket, onOpen: () -> Unit, onTrack: () -> Unit, 
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        runCatching {
+                        listOfNotNull(runCatching {
                             LocalDate.parse(ticket.serviceDate).format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy"))
-                        }.getOrDefault(ticket.serviceDate),
+                        }.getOrDefault(ticket.serviceDate), ticket.departureTimingLabel())
+                            .joinToString(" · "),
                         color = contentColor.copy(alpha = .75f),
                     )
                 }
@@ -1576,6 +1581,20 @@ private fun TicketDirection?.labelPrefix(): String = when (this) {
 private fun Ticket.isUpcoming(today: LocalDate = LocalDate.now(), nowMillis: Long = System.currentTimeMillis()): Boolean =
     scheduledArrivalEpochMillis?.let { it > nowMillis }
         ?: runCatching { !LocalDate.parse(serviceDate).isBefore(today) }.getOrDefault(true)
+
+private fun Ticket.departureTimingLabel(): String? {
+    val scheduled = scheduledDepartureEpochMillis?.let(::timeLabel)
+    val expected = expectedDepartureEpochMillis?.let(::timeLabel)
+    return when {
+        expected != null && scheduled != null && expected != scheduled -> "Expected $expected · scheduled $scheduled"
+        expected != null -> "Expected $expected"
+        scheduled != null -> "Departs $scheduled"
+        else -> null
+    }
+}
+
+private fun timeLabel(epochMillis: Long): String =
+    DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 
 private fun String.removeAccents(): String = java.text.Normalizer.normalize(this, java.text.Normalizer.Form.NFD)
     .replace(Regex("\\p{M}+"), "")
