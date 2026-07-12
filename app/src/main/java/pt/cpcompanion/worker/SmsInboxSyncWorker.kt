@@ -6,49 +6,34 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import pt.cpcompanion.TrainTrackerApplication
+import pt.cpcompanion.sms.SmsImportCoordinator
 
-/** Quiet fallback for devices where a CP SMS does not produce an accessible notification event. */
+/** Quiet fallback for the single app when the user explicitly opts into inbox import. */
 class SmsInboxSyncWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
+        val container = (applicationContext as TrainTrackerApplication).container
+        container.stores.awaitReady()
+        if (!container.stores.smsImportSettings.value.automaticSmsImportEnabled) return Result.success()
         if (ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.READ_SMS) !=
             PackageManager.PERMISSION_GRANTED
         ) return Result.success()
 
-        val container = (applicationContext as TrainTrackerApplication).container
         return runCatching {
-            val settings = container.stores.smsImportSettings.value
-            val result = withContext(Dispatchers.IO) {
-                container.smsTicketImporter.importInbox(
-                    stations = container.repository.cachedStations(),
-                    stopAtMessageId = settings.lastInboxCheckpointMessageId
-                        ?: settings.lastImportedInboxMessageId,
-                )
-            }
-            result.tickets.forEach { ticket ->
-                container.stores.upsertTicket(ticket)
-                TicketReminderScheduler.schedule(applicationContext, ticket)
-            }
-            result.newestImportedInboxMessageId?.let { checkpoint ->
-                container.stores.saveSmsImportSettings(
-                    container.stores.smsImportSettings.value.copy(lastImportedInboxMessageId = checkpoint),
-                )
-            }
-            result.newestScannedInboxMessageId?.let { checkpoint ->
-                container.stores.saveSmsImportSettings(
-                    container.stores.smsImportSettings.value.copy(
-                        lastInboxCheckpointMessageId = checkpoint,
-                    ),
-                )
-            }
+            SmsImportCoordinator.scanInbox(
+                context = applicationContext,
+                stations = container.repository.cachedStations(),
+                requireAutomaticOptIn = true,
+            )
         }.fold(
             onSuccess = { Result.success() },
-            onFailure = { Result.retry() },
+            onFailure = {
+                SmsImportCoordinator.recordFailedScan(applicationContext)
+                Result.retry()
+            },
         )
     }
 }

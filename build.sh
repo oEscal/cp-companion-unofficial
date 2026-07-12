@@ -96,7 +96,10 @@ printf '%s\n' "$PROJECTS_OUTPUT" | grep -q "Project ':app'" \
 
 "${GRADLE[@]}" "${COMMON_ARGS[@]}" \
   :app:testDebugUnitTest \
+  :app:lintDebug \
+  :app:assembleDebugAndroidTest \
   :app:assembleDebug \
+  :app:assembleRelease \
   "$@"
 
 mapfile -t APKS < <(find "$APP_DIR/build/outputs/apk" -type f -name '*-debug.apk' | sort)
