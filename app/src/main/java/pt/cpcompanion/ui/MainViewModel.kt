@@ -180,19 +180,39 @@ class MainViewModel(
 
     fun refreshCurrentScreen() {
         if (_state.value.loading) return
+
         when (val screen = _state.value.screen) {
-            AppScreen.Home,
-            AppScreen.Search,
-            AppScreen.Tickets -> refreshCatalogs()
-            AppScreen.Settings -> viewModelScope.launch {
-                setLoading(true)
-                runCatching { container.api.warmUpConfiguration() }
-                    .onSuccess { _state.value = _state.value.copy(message = "CP configuration refreshed") }
-                    .onFailure(::showError)
-                setLoading(false)
+            AppScreen.Home -> {
+                _state.value = _state.value.copy(
+                    message = "Home information is up to date",
+                )
             }
-            is AppScreen.StationScreen -> loadStation(screen.station)
-            is AppScreen.TripScreen -> loadTrip(screen.trainNumber, screen.date)
+
+            AppScreen.Search -> refreshCatalogs()
+
+            AppScreen.Tickets -> importSmsTickets(silent = false)
+
+            AppScreen.Settings -> {
+                viewModelScope.launch {
+                    setLoading(true)
+
+                    runCatching {
+                        container.api.warmUpConfiguration(forceRefresh = true)
+                    }.onSuccess {
+                        _state.value = _state.value.copy(
+                            message = "CP configuration refreshed",
+                        )
+                    }.onFailure(::showError)
+
+                    setLoading(false)
+                }
+            }
+
+            is AppScreen.StationScreen ->
+                loadStation(screen.station)
+
+            is AppScreen.TripScreen ->
+                loadTrip(screen.trainNumber, screen.date)
         }
     }
 
@@ -213,7 +233,7 @@ class MainViewModel(
     fun importSmsTickets(silent: Boolean = false) {
         val now = System.currentTimeMillis()
         val settings = container.stores.smsImportSettings.value
-        if (silent && settings.lastScanAtEpochMillis != null && now - settings.lastScanAtEpochMillis < 60_000) return
+        if (silent && settings.lastScanAtEpochMillis != null && now - settings.lastScanAtEpochMillis < 5 * 60_000L) return
         val stations = _state.value.stations
         viewModelScope.launch {
             _state.value = _state.value.copy(smsImporting = true)
@@ -261,40 +281,35 @@ class MainViewModel(
         }
     }
 
-    private suspend fun persistSmsImport(result: SmsImportResult, silent: Boolean) {
+    private suspend fun persistSmsImport(
+        result: SmsImportResult,
+        silent: Boolean,
+    ) {
         result.tickets.forEach { ticket ->
             container.stores.upsertTicket(ticket)
             TicketReminderScheduler.schedule(getApplication(), ticket)
-            if (ticket.originStationCode.isNotBlank() && ticket.destinationStationCode.isNotBlank()) {
-                runCatching {
-                    val trip = container.repository.trip(ticket.trainNumber, LocalDate.parse(ticket.serviceDate))
-                    val snapshot = container.resolver.resolve(ticket, trip)
-                    ticket.copy(
-                        serviceLabel = trip.serviceName ?: ticket.serviceLabel,
-                        originName = snapshot.originName,
-                        destinationName = snapshot.destinationName,
-                        scheduledDepartureEpochMillis = snapshot.scheduledOriginEpochMillis
-                            ?: ticket.scheduledDepartureEpochMillis,
-                        scheduledArrivalEpochMillis = snapshot.scheduledDestinationEpochMillis
-                            ?: ticket.scheduledArrivalEpochMillis,
-                    )
-                }.onSuccess { enriched ->
-                    container.stores.upsertTicket(enriched)
-                    TicketReminderScheduler.schedule(getApplication(), enriched)
-                }
-            }
         }
+
         if (!silent || result.tickets.isNotEmpty()) {
-            val issueSuffix = if (result.issues.isEmpty()) "" else
-                " ${result.issues.size} leg(s) will be matched to station codes after the station catalogue is refreshed."
+            val issueSuffix =
+                if (result.issues.isEmpty()) {
+                    ""
+                } else {
+                    " ${result.issues.size} leg(s) still need station matching."
+                }
+
             _state.value = _state.value.copy(
                 message = when {
                     result.tickets.isNotEmpty() ->
-                        "Imported or updated ${result.tickets.size} ticket leg(s) from ${result.candidateMessages} CP SMS message(s).$issueSuffix"
+                        "Imported or updated ${result.tickets.size} ticket leg(s) " +
+                            "from ${result.candidateMessages} CP SMS message(s).$issueSuffix"
+
                     result.candidateMessages == 0 ->
-                        "Checked ${result.messagesScanned} recent SMS message(s), but none contained a recognizable CP ticket. " +
-                            "Past tickets are supported; use Paste SMS if the sender or format is still not detected."
-                    else -> "CP ticket SMS found, but no ticket could be created.$issueSuffix"
+                        "Checked ${result.messagesScanned} recent SMS message(s), " +
+                            "but none contained a recognizable CP ticket."
+
+                    else ->
+                        "CP ticket SMS found, but no ticket could be created.$issueSuffix"
                 },
             )
         }
