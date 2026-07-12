@@ -159,17 +159,17 @@ class TrainTrackingService : Service() {
     }
 
     private fun retryDelay(failures: Int): Long = when (failures) {
-        1 -> 10_000L
-        2 -> 20_000L
-        3 -> 30_000L
-        else -> 60_000L
+        1 -> 30_000L
+        2 -> 60_000L
+        3 -> 90_000L
+        else -> 120_000L
     }
 
     companion object {
         const val ACTION_START = "pt.cpcompanion.action.START_TRACKING"
         const val ACTION_STOP = "pt.cpcompanion.action.STOP_TRACKING"
         const val EXTRA_TICKET_ID = "ticket_id"
-        private const val SUCCESS_INTERVAL_MS = 10_000L
+        private const val SUCCESS_INTERVAL_MS = 30_000L
 
         fun start(context: Context, ticketId: String) {
             val app = context.applicationContext as TrainTrackerApplication
