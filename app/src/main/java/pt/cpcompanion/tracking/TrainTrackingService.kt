@@ -81,6 +81,12 @@ class TrainTrackingService : Service() {
                     val trip = container.repository.trip(ticket.trainNumber, LocalDate.parse(ticket.serviceDate))
                     val snapshot = container.resolver.resolve(ticket, trip)
                     failures = 0
+                    val liveTicket = ticket.copy(
+                        expectedDepartureEpochMillis = snapshot.expectedOriginEpochMillis,
+                        expectedArrivalEpochMillis = snapshot.expectedDestinationEpochMillis,
+                        liveDelayMinutes = snapshot.delayMinutes,
+                    )
+                    if (liveTicket != ticket) container.stores.upsertTicket(liveTicket)
                     container.stores.saveTracking(snapshot)
                     updateNotification(snapshot)
                     if (snapshot.phase.isImportantAlertPhase() && snapshot.phase != previousPhase) {
