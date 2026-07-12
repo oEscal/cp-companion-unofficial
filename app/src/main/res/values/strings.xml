@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">CP Companion</string>
+    <string name="tracking_channel_name">Active train tracking</string>
+    <string name="tracking_channel_description">Silent updates for the train explicitly tracked by the user</string>
+    <string name="alerts_channel_name">Trip alerts</string>
+    <string name="alerts_channel_description">Cancellations, platform changes, and material delays</string>
+    <string name="reminders_channel_name">Upcoming trips</string>
+    <string name="reminders_channel_description">Reminders before saved ticket departures</string>
+</resources>
