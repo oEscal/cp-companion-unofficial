@@ -54,6 +54,9 @@ class MainActivity : ComponentActivity() {
 
     private fun consumeIntent(intent: Intent) {
         ticketToOpen.value = intent.getStringExtra(TrackingNotificationFactory.EXTRA_TICKET_ID)
+            ?: intent.data
+                ?.takeIf { it.scheme == "cpcompanion" && it.host == "trip" }
+                ?.getQueryParameter("ticketId")
         if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             sharedSmsText.value = intent.getStringExtra(Intent.EXTRA_TEXT)
         }

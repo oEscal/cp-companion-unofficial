@@ -1,3 +1,7 @@
+# Historical implementation plan
+
+> Retained for traceability; current behavior is documented in `docs/IMPLEMENTATION_STATUS.md`.
+
 > **Historical input plan:** This file came from the initial archive and records earlier constraints.
 > The implemented scope follows the later user requirements and is documented in
 > `README.md`, `TODO.md`, and `docs/IMPLEMENTATION_STATUS.md`.

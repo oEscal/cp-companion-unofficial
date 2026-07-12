@@ -1,5 +1,8 @@
 package pt.cpcompanion.notifications
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,6 +19,7 @@ import androidx.core.app.NotificationManagerCompat
 import pt.cpcompanion.MainActivity
 import pt.cpcompanion.R
 import pt.cpcompanion.domain.StatusChipFormatter
+import pt.cpcompanion.model.ExpectedTimeSource
 import pt.cpcompanion.model.PassengerPhase
 import pt.cpcompanion.model.TrackingSnapshot
 import pt.cpcompanion.tracking.TrainTrackingService
@@ -46,7 +50,7 @@ class TrackingNotificationFactory(private val context: Context) {
 
     fun build(snapshot: TrackingSnapshot): Notification = if (
         Build.VERSION.SDK_INT >= 36 &&
-        snapshot.phase.supportsLiveUpdate() &&
+        snapshot.isLiveUpdateEligible() &&
         context.getSystemService(NotificationManager::class.java).canPostPromotedNotifications()
     ) {
         buildProgressNotification(snapshot)
@@ -55,20 +59,25 @@ class TrackingNotificationFactory(private val context: Context) {
     }
 
     fun postImportantAlert(snapshot: TrackingSnapshot) {
+        val platform = snapshot.platform?.let { " · ${context.getString(R.string.platform, it)}" }.orEmpty()
+        val carriage = snapshot.carriage?.let { " · ${context.getString(R.string.carriage_value, it)}" }.orEmpty()
+        val seat = snapshot.seat?.let { " · ${context.getString(R.string.seat_value, it)}" }.orEmpty()
         val (title, text) = when (snapshot.phase) {
             PassengerPhase.BOARDING_SOON ->
-                "Train ${snapshot.trainNumber} is almost at ${snapshot.originName}" to
-                    "Boarding shortly${snapshot.platform?.let { " · Platform $it" } ?: ""}"
+                context.getString(R.string.alert_train_almost_at, snapshot.trainNumber, snapshot.originName) to
+                    "${context.getString(R.string.alert_boarding_shortly)}$platform"
             PassengerPhase.ON_BOARD ->
-                "Train ${snapshot.trainNumber} has reached ${snapshot.originName}" to
-                    "Board now${snapshot.carriage?.let { " · Carriage $it" } ?: ""}${snapshot.seat?.let { " · Seat $it" } ?: ""}"
+                context.getString(R.string.alert_train_reached_origin, snapshot.trainNumber, snapshot.originName) to
+                    "${context.getString(R.string.alert_board_now)}$carriage$seat"
             PassengerPhase.APPROACHING_DESTINATION ->
-                "Approaching ${snapshot.destinationName}" to
-                    "Train ${snapshot.trainNumber} arrives soon"
+                context.getString(R.string.alert_approaching_destination, snapshot.destinationName) to
+                    context.getString(R.string.alert_arrives_soon, snapshot.trainNumber)
             PassengerPhase.ARRIVED ->
-                "Arrived at ${snapshot.destinationName}" to "Train ${snapshot.trainNumber} has arrived"
+                context.getString(R.string.notification_arrived, snapshot.destinationName) to
+                    context.getString(R.string.alert_train_arrived, snapshot.trainNumber)
             PassengerPhase.CANCELLED ->
-                "Train ${snapshot.trainNumber} disrupted" to "Check the latest trip details"
+                context.getString(R.string.notification_train_disrupted, snapshot.trainNumber) to
+                    context.getString(R.string.alert_check_trip)
             else -> return
         }
         val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
@@ -81,11 +90,29 @@ class TrackingNotificationFactory(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVibrate(longArrayOf(0, 180, 100, 180))
             .build()
-        NotificationManagerCompat.from(context).notify(ALERT_NOTIFICATION_ID, notification)
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        val notificationManager = NotificationManagerCompat.from(context)
+        if (!notificationManager.areNotificationsEnabled()) return
+
+        try {
+            notificationManager.notify(ALERT_NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // Permission or notification policy changed between the check and notify().
+        }
     }
 
     private fun buildFallback(snapshot: TrackingSnapshot): Notification {
         val content = content(snapshot)
+        val terminal = snapshot.phase.isTerminal()
         return NotificationCompat.Builder(context, CHANNEL_TRACKING)
             .setSmallIcon(iconFor(snapshot.phase))
             .setContentTitle(content.title)
@@ -93,37 +120,48 @@ class TrackingNotificationFactory(private val context: Context) {
             .setSubText(content.subtext)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content.expanded))
             .setContentIntent(openIntent(snapshot.ticketId))
-            .setDeleteIntent(stopIntent(snapshot.ticketId))
-            .addAction(R.drawable.ic_stop, "Stop tracking", stopIntent(snapshot.ticketId))
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setOngoing(!snapshot.phase.isTerminal())
+            .setOngoing(!terminal)
+            .setAutoCancel(terminal)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setWhen(snapshot.expectedEventEpochMillis ?: snapshot.updatedAtEpochMillis)
+            .setWhen(snapshot.expectedEventEpochMillis ?: snapshot.lastSuccessfulFetchEpochMillis)
             .setShowWhen(snapshot.expectedEventEpochMillis != null)
+            .apply {
+                if (!terminal) {
+                    setDeleteIntent(stopIntent(snapshot.ticketId))
+                    addAction(R.drawable.ic_stop, context.getString(R.string.stop_and_disable), stopIntent(snapshot.ticketId))
+                }
+            }
             .build()
     }
 
     @RequiresApi(36)
     private fun buildProgressNotification(snapshot: TrackingSnapshot): Notification {
         val content = content(snapshot)
-        val progress = snapshot.progress.coerceIn(0, snapshot.progressMax)
+        val progressMax = snapshot.progressMax.coerceAtLeast(2)
+        val progress = snapshot.progress.coerceIn(0, progressMax)
+        val pointPositions = buildSet {
+            add(1)
+            snapshot.progressMarkers.forEach { marker -> add(marker.coerceIn(1, progressMax - 1)) }
+            add(progressMax)
+        }
         val style = Notification.ProgressStyle()
             .setStyledByProgress(true)
             .setProgress(progress)
             .setProgressTrackerIcon(Icon.createWithResource(context, iconFor(snapshot.phase)))
             .setProgressSegments(
-                listOf(Notification.ProgressStyle.Segment(snapshot.progressMax).setColor(Color.rgb(0, 108, 76))),
+                listOf(Notification.ProgressStyle.Segment(progressMax).setColor(Color.rgb(0, 108, 76))),
             )
             .setProgressPoints(
-                buildList {
-                    add(Notification.ProgressStyle.Point(0).setColor(Color.rgb(0, 108, 76)))
-                    snapshot.progressMarkers.forEach { marker ->
-                        add(Notification.ProgressStyle.Point(marker.coerceIn(1, snapshot.progressMax - 1))
-                            .setColor(Color.rgb(70, 100, 90)))
+                pointPositions.sorted().map { position ->
+                    val color = when (position) {
+                        1 -> Color.rgb(0, 108, 76)
+                        progressMax -> Color.rgb(0, 80, 170)
+                        else -> Color.rgb(70, 100, 90)
                     }
-                    add(Notification.ProgressStyle.Point(snapshot.progressMax).setColor(Color.rgb(0, 80, 170)))
+                    Notification.ProgressStyle.Point(position).setColor(color)
                 },
             )
 
@@ -137,14 +175,6 @@ class TrackingNotificationFactory(private val context: Context) {
             .setSubText(content.subtext)
             .setStyle(style)
             .setContentIntent(openIntent(snapshot.ticketId))
-            .setDeleteIntent(stopIntent(snapshot.ticketId))
-            .addAction(
-                Notification.Action.Builder(
-                    Icon.createWithResource(context, R.drawable.ic_stop),
-                    "Stop tracking",
-                    stopIntent(snapshot.ticketId),
-                ).build(),
-            )
             .setOnlyAlertOnce(true)
             .setOngoing(!snapshot.phase.isTerminal())
             .setCategory(Notification.CATEGORY_NAVIGATION)
@@ -152,6 +182,16 @@ class TrackingNotificationFactory(private val context: Context) {
             .setColorized(false)
             .setExtras(extras)
             .apply {
+                if (!snapshot.phase.isTerminal()) {
+                    setDeleteIntent(stopIntent(snapshot.ticketId))
+                    addAction(
+                        Notification.Action.Builder(
+                            Icon.createWithResource(context, R.drawable.ic_stop),
+                            context.getString(R.string.stop_and_disable),
+                            stopIntent(snapshot.ticketId),
+                        ).build(),
+                    )
+                }
                 snapshot.expectedEventEpochMillis?.takeIf { it > System.currentTimeMillis() }?.let {
                     setWhen(it)
                     setShowWhen(true)
@@ -165,85 +205,117 @@ class TrackingNotificationFactory(private val context: Context) {
     fun promotionStatus(): String {
         val manager = context.getSystemService(NotificationManager::class.java)
         return if (manager.canPostPromotedNotifications()) {
-            "Live Update promotion is allowed"
+            context.getString(R.string.promotion_allowed)
         } else {
-            "Live Update promotion is disabled or unavailable; standard ongoing notifications remain active"
+            context.getString(R.string.promotion_unavailable)
         }
     }
 
     private fun content(snapshot: TrackingSnapshot): NotificationContent {
-        val expected = snapshot.expectedEventEpochMillis?.let(::formatTime)
-        val scheduled = snapshot.scheduledEventEpochMillis?.let(::formatTime)
+        val expected = snapshot.expectedEventEpochMillis?.let { formatTime(it, snapshot.eventTimeZoneId) }
+        val scheduled = snapshot.scheduledEventEpochMillis?.let { formatTime(it, snapshot.eventTimeZoneId) }
+        val expectedLabel = context.getString(
+            when (snapshot.expectedTimeSource) {
+                ExpectedTimeSource.OBSERVED -> R.string.expected
+                ExpectedTimeSource.CALCULATED_FROM_STOP_DELAY,
+                ExpectedTimeSource.CALCULATED_FROM_TRAIN_DELAY -> R.string.estimated
+                ExpectedTimeSource.SCHEDULED_ONLY -> R.string.scheduled
+                ExpectedTimeSource.UNKNOWN -> R.string.expected
+            },
+        )
+        val calculating = context.getString(R.string.calculating)
+        val staleSuffix = if (snapshot.dataStale) " · ${context.getString(R.string.live_data_stale)}" else ""
         val delay = when {
-            snapshot.delayMinutes == null -> "Delay not reported"
-            snapshot.delayMinutes > 0 -> "${snapshot.delayMinutes} min late"
-            else -> "On time"
+            snapshot.delayMinutes == null -> context.getString(R.string.delay_not_reported)
+            snapshot.delayMinutes > 0 -> context.getString(R.string.minutes_late, snapshot.delayMinutes)
+            else -> context.getString(R.string.on_time)
         }
-        val platform = snapshot.platform?.takeIf(String::isNotBlank)?.let { "Platform $it" }
+        val platform = snapshot.platform?.takeIf(String::isNotBlank)?.let { context.getString(R.string.platform, it) }
         val boarding = listOfNotNull(
-            snapshot.carriage?.takeIf(String::isNotBlank)?.let { "Carriage $it" },
-            snapshot.seat?.takeIf(String::isNotBlank)?.let { "Seat $it" },
+            snapshot.carriage?.takeIf(String::isNotBlank)?.let { context.getString(R.string.carriage_value, it) },
+            snapshot.seat?.takeIf(String::isNotBlank)?.let { context.getString(R.string.seat_value, it) },
         ).joinToString(" · ")
+        val expectedOrScheduled = expected ?: scheduled ?: calculating
 
         return when (snapshot.phase) {
             PassengerPhase.BOARDING_SOON -> NotificationContent(
-                title = "Train ${snapshot.trainNumber} arriving soon",
+                title = context.getString(R.string.notification_train_arriving, snapshot.trainNumber),
                 text = listOfNotNull(platform, boarding.takeIf(String::isNotBlank)).joinToString(" · ").ifBlank { snapshot.originName },
                 subtext = snapshot.originName,
                 expanded = listOfNotNull(
-                    "Expected at ${expected ?: "calculating"}",
-                    scheduled?.let { "Scheduled $it" },
+                    context.getString(R.string.expected_at, expectedLabel, expected ?: calculating) + staleSuffix,
+                    scheduled?.let { context.getString(R.string.scheduled_time, it) },
                     delay,
                     platform,
                     boarding.takeIf(String::isNotBlank),
+                    snapshot.message.takeIf { snapshot.dataStale },
                 ).joinToString("\n"),
             )
             PassengerPhase.APPROACHING_ORIGIN, PassengerPhase.PRE_TRIP -> NotificationContent(
-                title = "Train ${snapshot.trainNumber} approaching ${snapshot.originName}",
-                text = "Expected ${expected ?: scheduled ?: "calculating"} · $delay",
+                title = context.getString(
+                    R.string.notification_train_approaching,
+                    snapshot.trainNumber,
+                    snapshot.originName,
+                ),
+                text = "$expectedLabel $expectedOrScheduled · $delay$staleSuffix",
                 subtext = platform,
-                expanded = "${snapshot.originName} → ${snapshot.destinationName}\n" +
-                    "Expected ${expected ?: "calculating"}" +
-                    (scheduled?.let { " · scheduled $it" } ?: "") + "\n$delay" +
-                    (platform?.let { " · $it" } ?: ""),
+                expanded = buildString {
+                    append(snapshot.originName).append(" → ").append(snapshot.destinationName).append('\n')
+                    append(context.getString(R.string.expected_line, expected ?: calculating))
+                    scheduled?.let { append(" · ").append(context.getString(R.string.scheduled_inline, it)) }
+                    append('\n').append(delay)
+                    platform?.let { append(" · ").append(it) }
+                    snapshot.message?.takeIf { snapshot.dataStale }?.let { append('\n').append(it) }
+                },
             )
             PassengerPhase.ON_BOARD, PassengerPhase.APPROACHING_DESTINATION -> NotificationContent(
-                title = "Train ${snapshot.trainNumber} to ${snapshot.destinationName}",
+                title = context.getString(
+                    R.string.notification_train_to,
+                    snapshot.trainNumber,
+                    snapshot.destinationName,
+                ),
                 text = listOfNotNull(
-                    "Expected ${expected ?: scheduled ?: "calculating"}",
+                    "$expectedLabel $expectedOrScheduled$staleSuffix",
                     delay,
                     boarding.takeIf(String::isNotBlank),
                 ).joinToString(" · "),
-                subtext = snapshot.nextStopName?.let { "Next: $it" },
-                expanded = "Destination: ${snapshot.destinationName}\n" +
-                    "Expected ${expected ?: "calculating"}" +
-                    (scheduled?.let { " · scheduled $it" } ?: "") + "\n$delay" +
-                    (boarding.takeIf(String::isNotBlank)?.let { "\n$it" } ?: "") +
-                    (snapshot.nextStopName?.let { "\nNext stop: $it" } ?: ""),
+                subtext = snapshot.nextStopName?.let { context.getString(R.string.next_stop, it) },
+                expanded = buildString {
+                    append(context.getString(R.string.destination_line, snapshot.destinationName)).append('\n')
+                    append(context.getString(R.string.expected_line, expected ?: calculating))
+                    scheduled?.let { append(" · ").append(context.getString(R.string.scheduled_inline, it)) }
+                    append('\n').append(delay)
+                    boarding.takeIf(String::isNotBlank)?.let { append('\n').append(it) }
+                    snapshot.nextStopName?.let { append('\n').append(context.getString(R.string.next_stop_line, it)) }
+                    snapshot.message?.takeIf { snapshot.dataStale }?.let { append('\n').append(it) }
+                },
             )
             PassengerPhase.CANCELLED -> NotificationContent(
-                title = "Train ${snapshot.trainNumber} disrupted",
-                text = "The selected passenger segment includes a cancelled stop",
+                title = context.getString(R.string.notification_train_disrupted, snapshot.trainNumber),
+                text = context.getString(R.string.passenger_endpoint_unavailable),
                 subtext = snapshot.destinationName,
-                expanded = snapshot.message ?: "Open the trip for the latest service information.",
+                expanded = snapshot.message ?: context.getString(R.string.open_trip_latest),
             )
             PassengerPhase.DATA_UNAVAILABLE -> NotificationContent(
-                title = "Tracking train ${snapshot.trainNumber}",
-                text = "Live data temporarily unavailable",
-                subtext = "Last update ${formatTime(snapshot.updatedAtEpochMillis)}",
-                expanded = "The last valid trip information is being retained. Retrying automatically.",
+                title = context.getString(R.string.notification_tracking_train, snapshot.trainNumber),
+                text = context.getString(R.string.live_data_unavailable),
+                subtext = context.getString(
+                    R.string.last_live_data,
+                    formatTime(snapshot.lastSuccessfulFetchEpochMillis, snapshot.eventTimeZoneId),
+                ),
+                expanded = context.getString(R.string.retaining_last_trip),
             )
             PassengerPhase.ARRIVED -> NotificationContent(
-                title = "Arrived at ${snapshot.destinationName}",
-                text = "Train ${snapshot.trainNumber} tracking completed",
+                title = context.getString(R.string.notification_arrived, snapshot.destinationName),
+                text = context.getString(R.string.tracking_completed, snapshot.trainNumber),
                 subtext = null,
-                expanded = "The active tracking session has ended.",
+                expanded = context.getString(R.string.active_session_ended),
             )
             PassengerPhase.STOPPED -> NotificationContent(
-                title = "Tracking stopped",
-                text = "Train ${snapshot.trainNumber}",
+                title = context.getString(R.string.notification_tracking_stopped),
+                text = context.getString(R.string.train_value, snapshot.trainNumber),
                 subtext = null,
-                expanded = "Open the app to start another tracking session.",
+                expanded = context.getString(R.string.open_app_another_session),
             )
         }
     }
@@ -271,8 +343,8 @@ class TrackingNotificationFactory(private val context: Context) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun formatTime(epochMillis: Long): String = FORMATTER.format(
-        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()),
+    private fun formatTime(epochMillis: Long, zoneId: String): String = FORMATTER.format(
+        Instant.ofEpochMilli(epochMillis).atZone(runCatching { ZoneId.of(zoneId) }.getOrDefault(ZoneId.of("Europe/Lisbon"))),
     )
 
     private fun PassengerPhase.isTerminal() = this in setOf(
@@ -281,13 +353,14 @@ class TrackingNotificationFactory(private val context: Context) {
         PassengerPhase.STOPPED,
     )
 
-    private fun PassengerPhase.supportsLiveUpdate() = this in setOf(
-        PassengerPhase.PRE_TRIP,
-        PassengerPhase.APPROACHING_ORIGIN,
+    private fun TrackingSnapshot.isLiveUpdateEligible(): Boolean = when (phase) {
         PassengerPhase.BOARDING_SOON,
         PassengerPhase.ON_BOARD,
-        PassengerPhase.APPROACHING_DESTINATION,
-    )
+        PassengerPhase.APPROACHING_DESTINATION -> true
+        PassengerPhase.APPROACHING_ORIGIN -> expectedOriginEpochMillis
+            ?.let { it - System.currentTimeMillis() <= 15L * 60L * 1000L } == true
+        else -> false
+    }
 
     private data class NotificationContent(
         val title: String,
