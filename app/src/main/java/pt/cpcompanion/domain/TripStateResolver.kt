@@ -47,10 +47,6 @@ class TripStateResolver {
             event?.toInstant()?.let { !it.isAfter(now) } == true
         }
         val currentIndex = maxOf(lastReportedIndex ?: -1, inferredIndex).coerceAtLeast(originIndex - 1)
-        val totalLegs = (destinationIndex - originIndex).coerceAtLeast(1)
-        val passedLegs = (currentIndex - originIndex).coerceIn(0, totalLegs)
-        val progress = (passedLegs * 1000 / totalLegs).coerceIn(0, 1000)
-
         val durationToOrigin = originEventExpected?.let { Duration.between(now, it.toInstant()) }
         val minutesToDestination = destinationExpected?.let { Duration.between(now, it.toInstant()).toMinutes() }
         val cancelled = trip.stops.subList(originIndex, destinationIndex + 1).any { it.isCancelled }
@@ -91,13 +87,31 @@ class TripStateResolver {
         val delay = when (phase) {
             PassengerPhase.PRE_TRIP,
             PassengerPhase.APPROACHING_ORIGIN,
-            PassengerPhase.BOARDING_SOON -> trip.stops[originIndex].delayMinutes ?: trip.overallDelayMinutes
-            else -> trip.stops[destinationIndex].delayMinutes ?: trip.overallDelayMinutes
+            PassengerPhase.BOARDING_SOON -> trip.overallDelayMinutes ?: trip.stops[originIndex].delayMinutes
+            else -> trip.overallDelayMinutes ?: trip.stops[destinationIndex].delayMinutes
         }
+        val originInstant = originEventExpected?.toInstant()
+        val destinationInstant = destinationExpected?.toInstant()
+        val approachingOrigin = originInstant?.let { now.isBefore(it) } == true
+        val progressEnd = if (approachingOrigin) originInstant else destinationInstant
+        val progressStart = when {
+            progressEnd == null -> null
+            approachingOrigin -> progressEnd.minus(Duration.ofHours(1))
+            originInstant != null -> originInstant
+            else -> progressEnd.minus(Duration.ofHours(1))
+        }
+        val progress = timeProgress(progressStart, progressEnd, now)
+        val markerStops = if (approachingOrigin) {
+            resolved.take(originIndex)
+        } else {
+            resolved.drop(originIndex + 1).take((destinationIndex - originIndex - 1).coerceAtLeast(0))
+        }
+        val progressMarkers = markerPositions(markerStops, progressStart, progressEnd)
 
         return TrackingSnapshot(
             ticketId = ticket.id,
             trainNumber = ticket.trainNumber,
+            serviceLabel = trip.serviceName ?: ticket.serviceLabel,
             serviceDate = ticket.serviceDate,
             phase = phase,
             originName = ticket.originName ?: trip.stops[originIndex].station.name,
@@ -108,6 +122,7 @@ class TripStateResolver {
             expectedEventEpochMillis = eventExpected?.toInstant()?.toEpochMilli(),
             scheduledOriginEpochMillis = originBoardingScheduled?.toInstant()?.toEpochMilli(),
             expectedOriginEpochMillis = originBoardingExpected?.toInstant()?.toEpochMilli(),
+            expectedOriginArrivalEpochMillis = originEventExpected?.toInstant()?.toEpochMilli(),
             scheduledDestinationEpochMillis = destinationScheduled?.toInstant()?.toEpochMilli(),
             expectedDestinationEpochMillis = destinationExpected?.toInstant()?.toEpochMilli(),
             delayMinutes = delay,
@@ -120,6 +135,7 @@ class TripStateResolver {
             carriage = ticket.carriage,
             seat = ticket.seat,
             progress = progress,
+            progressMarkers = progressMarkers,
             message = trip.messages.firstOrNull(),
             updatedAtEpochMillis = trip.fetchedAtEpochMillis,
         )
@@ -130,6 +146,24 @@ class TripStateResolver {
         consecutiveFailures = failures,
         updatedAtEpochMillis = System.currentTimeMillis(),
     )
+
+    private fun timeProgress(start: Instant?, end: Instant?, now: Instant): Int {
+        if (start == null || end == null || !end.isAfter(start)) return 0
+        val elapsed = Duration.between(start, now).toMillis().coerceIn(0L, Duration.between(start, end).toMillis())
+        return (elapsed * 1000L / Duration.between(start, end).toMillis()).toInt()
+    }
+
+    private fun markerPositions(stops: List<ResolvedStop>, start: Instant?, end: Instant?): List<Int> {
+        if (start == null || end == null || !end.isAfter(start)) return emptyList()
+        val duration = Duration.between(start, end).toMillis()
+        return stops.mapNotNull { stop ->
+            (stop.expectedArrival ?: stop.expectedDeparture ?: stop.scheduledArrival ?: stop.scheduledDeparture)
+                ?.toInstant()
+        }.filter { it.isAfter(start) && it.isBefore(end) }
+            .map { (Duration.between(start, it).toMillis() * 1000L / duration).toInt() }
+            .distinct()
+            .sorted()
+    }
 
     private fun resolveStops(trip: TrainTrip): List<ResolvedStop> {
         val serviceDate = LocalDate.parse(trip.serviceDate)

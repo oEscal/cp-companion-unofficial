@@ -7,6 +7,9 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.tracking.TrainTrackingService
 
@@ -25,8 +28,26 @@ class UpcomingTripReminderWorker(
         ) {
             return Result.success()
         }
-        if (ticket.originStationCode.isBlank() || ticket.destinationStationCode.isBlank()) return Result.success()
-        TrainTrackingService.start(applicationContext, ticketId)
+        val resolvedTicket = runCatching {
+            withContext(Dispatchers.IO) {
+                var stations = container.repository.cachedStations()
+                var resolved = container.smsTicketImporter.resolveTicketStations(ticket, stations)
+                if (resolved.originStationCode.isBlank() || resolved.destinationStationCode.isBlank()) {
+                    // A background worker can run before the UI has refreshed the
+                    // station catalogue. Refresh once here instead of dropping the
+                    // automatic tracking session.
+                    stations = container.repository.refreshStations()
+                    resolved = container.smsTicketImporter.resolveTicketStations(ticket, stations)
+                }
+                resolved
+            }
+        }.getOrElse { return Result.retry() }
+        if (resolvedTicket.originStationCode.isBlank() || resolvedTicket.destinationStationCode.isBlank()) {
+            val departure = ticket.scheduledDepartureEpochMillis
+            return if (departure != null && departure > Instant.now().toEpochMilli()) Result.retry() else Result.success()
+        }
+        if (resolvedTicket != ticket) container.stores.upsertTicket(resolvedTicket)
+        TrainTrackingService.start(applicationContext, resolvedTicket.id)
         return Result.success()
     }
 

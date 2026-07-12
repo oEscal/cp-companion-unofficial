@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import pt.cpcompanion.AppContainer
 import pt.cpcompanion.model.SmsImportSettings
 import pt.cpcompanion.model.Station
@@ -62,6 +65,10 @@ class MainViewModel(
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
     private val backStack = ArrayDeque<AppScreen>()
+    private var smsImportJob: Job? = null
+    private var stationLoadJob: Job? = null
+    private var boardLoadJob: Job? = null
+    private var tripLoadJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -221,6 +228,11 @@ class MainViewModel(
         loadTrip(screen.trainNumber, screen.date, showLoading = true)
     }
 
+    fun refreshCurrentTripSilently() {
+        val screen = _state.value.screen as? AppScreen.TripScreen ?: return
+        loadTrip(screen.trainNumber, screen.date, showLoading = false)
+    }
+
     fun setSmsAutoScan(enabled: Boolean) {
         container.stores.saveSmsImportSettings(
             container.stores.smsImportSettings.value.copy(autoScanOnAppOpen = enabled),
@@ -231,23 +243,34 @@ class MainViewModel(
     }
 
     fun importSmsTickets(silent: Boolean = false) {
+        if (smsImportJob?.isActive == true) return
         val now = System.currentTimeMillis()
         val settings = container.stores.smsImportSettings.value
         if (silent && settings.lastScanAtEpochMillis != null && now - settings.lastScanAtEpochMillis < 5 * 60_000L) return
         val stations = _state.value.stations
-        viewModelScope.launch {
+        smsImportJob = viewModelScope.launch {
             _state.value = _state.value.copy(smsImporting = true)
             runCatching {
-                container.smsTicketImporter.importInbox(
-                    stations = stations,
-                    stopAtMessageId = settings.lastImportedInboxMessageId,
-                )
+                withContext(Dispatchers.IO) {
+                    container.smsTicketImporter.importInbox(
+                        stations = stations,
+                        stopAtMessageId = settings.lastInboxCheckpointMessageId
+                            ?: settings.lastImportedInboxMessageId,
+                    )
+                }
             }.onSuccess { result ->
                 persistSmsImport(result, silent)
                 result.newestImportedInboxMessageId?.let { newestMessageId ->
                     container.stores.saveSmsImportSettings(
                         container.stores.smsImportSettings.value.copy(
                             lastImportedInboxMessageId = newestMessageId,
+                        ),
+                    )
+                }
+                result.newestScannedInboxMessageId?.let { checkpoint ->
+                    container.stores.saveSmsImportSettings(
+                        container.stores.smsImportSettings.value.copy(
+                            lastInboxCheckpointMessageId = checkpoint,
                         ),
                     )
                 }
@@ -272,7 +295,11 @@ class MainViewModel(
         val stations = _state.value.stations
         viewModelScope.launch {
             _state.value = _state.value.copy(smsImporting = true)
-            runCatching { container.smsTicketImporter.importSharedText(text, stations) }
+            runCatching {
+                withContext(Dispatchers.Default) {
+                    container.smsTicketImporter.importSharedText(text, stations)
+                }
+            }
                 .onSuccess { result -> persistSmsImport(result, silent = false) }
                 .onFailure { error -> _state.value = _state.value.copy(
                     message = error.message ?: "The shared text could not be imported",
@@ -285,9 +312,11 @@ class MainViewModel(
         result: SmsImportResult,
         silent: Boolean,
     ) {
-        result.tickets.forEach { ticket ->
-            container.stores.upsertTicket(ticket)
-            TicketReminderScheduler.schedule(getApplication(), ticket)
+        withContext(Dispatchers.IO) {
+            result.tickets.forEach { ticket ->
+                container.stores.upsertTicket(ticket)
+                TicketReminderScheduler.schedule(getApplication(), ticket)
+            }
         }
 
         if (!silent || result.tickets.isNotEmpty()) {
@@ -369,16 +398,31 @@ class MainViewModel(
     }
 
     fun startTracking(ticket: Ticket) {
-        val resolved = container.smsTicketImporter.resolveTicketStations(ticket, _state.value.stations)
-        if (resolved.originStationCode.isBlank() || resolved.destinationStationCode.isBlank()) {
-            _state.value = _state.value.copy(
-                message = "This SMS ticket still needs station matching. Refresh the station catalogue before tracking.",
-            )
-            return
+        viewModelScope.launch {
+            val resolved = runCatching {
+                withContext(Dispatchers.IO) {
+                    var stations = _state.value.stations.ifEmpty { container.repository.cachedStations() }
+                    var matched = container.smsTicketImporter.resolveTicketStations(ticket, stations)
+                    if (matched.originStationCode.isBlank() || matched.destinationStationCode.isBlank()) {
+                        stations = container.repository.refreshStations()
+                        matched = container.smsTicketImporter.resolveTicketStations(ticket, stations)
+                    }
+                    matched
+                }
+            }.getOrElse { error ->
+                showError(error)
+                return@launch
+            }
+            if (resolved.originStationCode.isBlank() || resolved.destinationStationCode.isBlank()) {
+                _state.value = _state.value.copy(
+                    message = "This ticket's stations could not be matched to CP's current catalogue.",
+                )
+                return@launch
+            }
+            container.stores.upsertTicket(resolved)
+            TrainTrackingService.start(getApplication(), resolved.id)
+            _state.value = _state.value.copy(message = "Tracking started")
         }
-        container.stores.upsertTicket(resolved)
-        TrainTrackingService.start(getApplication(), resolved.id)
-        _state.value = _state.value.copy(message = "Tracking started")
     }
 
     fun stopTracking() {
@@ -387,7 +431,8 @@ class MainViewModel(
     }
 
     private fun loadStation(station: Station) {
-        viewModelScope.launch {
+        stationLoadJob?.cancel()
+        stationLoadJob = viewModelScope.launch {
             setLoading(true)
             val details = runCatching { container.repository.stationDetails(station.code) }
                 .onFailure(::showError)
@@ -409,7 +454,8 @@ class MainViewModel(
     }
 
     private fun loadBoard(stationCode: String, departures: Boolean, showLoading: Boolean = true) {
-        viewModelScope.launch {
+        boardLoadJob?.cancel()
+        boardLoadJob = viewModelScope.launch {
             if (showLoading) setLoading(true)
             runCatching {
                 container.repository.stationBoard(stationCode, LocalDate.now(), departures, LocalTime.now())
@@ -423,7 +469,8 @@ class MainViewModel(
     }
 
     private fun loadTrip(trainNumber: String, date: String, showLoading: Boolean = true) {
-        viewModelScope.launch {
+        tripLoadJob?.cancel()
+        tripLoadJob = viewModelScope.launch {
             if (showLoading) setLoading(true)
             runCatching { container.repository.trip(trainNumber, LocalDate.parse(date)) }
                 .onSuccess { _state.value = _state.value.copy(selectedTrip = it, message = null) }

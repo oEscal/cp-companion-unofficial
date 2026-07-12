@@ -321,7 +321,15 @@ private fun HomeScreen(
             val nextTicket = state.tickets.firstOrNull { ticket ->
                 runCatching { LocalDate.parse(ticket.serviceDate) >= LocalDate.now() }.getOrDefault(false)
             }
-            state.tracking?.let { ActiveTrackingCard(it, stopTracking) }
+            state.tracking?.let { snapshot ->
+                ActiveTrackingCard(
+                    snapshot = snapshot,
+                    stopTracking = stopTracking,
+                    onOpen = {
+                        navigate(AppScreen.TripScreen(snapshot.trainNumber, snapshot.serviceDate, snapshot.ticketId))
+                    },
+                )
+            }
                 ?: UpcomingHero(nextTicket, navigate, startTracking)
         }
         item {
@@ -380,7 +388,7 @@ private fun UpcomingHero(ticket: Ticket?, navigate: (AppScreen) -> Unit, startTr
                 Button(onClick = { navigate(AppScreen.Tickets) }) { Text("Add ticket") }
             } else {
                 Text("Next saved trip", style = MaterialTheme.typography.labelLarge)
-                Text("Train ${ticket.trainNumber}", style = MaterialTheme.typography.displaySmall)
+                Text("${ticket.serviceLabel ?: "Train"} ${ticket.trainNumber}", style = MaterialTheme.typography.displaySmall)
                 Text("${ticket.originName ?: ticket.originStationCode} → ${ticket.destinationName ?: ticket.destinationStationCode}")
                 Text(ticket.serviceDate, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -395,8 +403,13 @@ private fun UpcomingHero(ticket: Ticket?, navigate: (AppScreen) -> Unit, startTr
 }
 
 @Composable
-private fun ActiveTrackingCard(snapshot: TrackingSnapshot, stopTracking: () -> Unit) {
+private fun ActiveTrackingCard(
+    snapshot: TrackingSnapshot,
+    stopTracking: () -> Unit,
+    onOpen: () -> Unit,
+) {
     Card(
+        onClick = onOpen,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -413,7 +426,10 @@ private fun ActiveTrackingCard(snapshot: TrackingSnapshot, stopTracking: () -> U
                 )
                 Column {
                     Text(snapshot.phase.label(), style = MaterialTheme.typography.labelLarge)
-                    Text("Train ${snapshot.trainNumber}", style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        "${snapshot.serviceLabel ?: "Train"} ${snapshot.trainNumber}",
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
                 }
             }
             Text("${snapshot.originName} → ${snapshot.destinationName}")
@@ -621,7 +637,7 @@ private fun StationScreen(state: MainUiState, viewModel: MainViewModel) {
     val screen = state.screen as? AppScreen.StationScreen
     LaunchedEffect(screen?.station?.code, state.boardDepartures) {
         while (screen != null) {
-            delay(20_000)
+            delay(30_000)
             viewModel.refreshCurrentStationBoard()
         }
     }
@@ -747,6 +763,13 @@ private fun TripScreen(
     val existingTicket = state.tickets.firstOrNull { it.id == ticketId }
     var showTrackingDialog by remember { mutableStateOf(false) }
     val currentStopIndex = remember(trip) { inferCurrentStopIndex(trip) }
+
+    LaunchedEffect(trip.trainNumber, trip.serviceDate) {
+        while (true) {
+            delay(30_000)
+            viewModel.refreshCurrentTripSilently()
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
