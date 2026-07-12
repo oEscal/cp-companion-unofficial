@@ -19,6 +19,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,6 +38,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
@@ -319,7 +321,7 @@ private fun HomeScreen(
         }
         item {
             val nextTicket = state.tickets.firstOrNull { ticket ->
-                runCatching { LocalDate.parse(ticket.serviceDate) >= LocalDate.now() }.getOrDefault(false)
+                ticket.isUpcoming()
             }
             state.tracking?.let { snapshot ->
                 ActiveTrackingCard(
@@ -393,9 +395,13 @@ private fun UpcomingHero(ticket: Ticket?, navigate: (AppScreen) -> Unit, startTr
                 Text(ticket.serviceDate, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { startTracking(ticket) }) { Text("Track train") }
-                    OutlinedButton(onClick = {
-                        navigate(AppScreen.TripScreen(ticket.trainNumber, ticket.serviceDate, ticket.id))
-                    }) { Text("Trip") }
+                    OutlinedButton(
+                        onClick = { navigate(AppScreen.TripScreen(ticket.trainNumber, ticket.serviceDate, ticket.id)) },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f)),
+                    ) { Text("Trip") }
                 }
             }
         }
@@ -1046,7 +1052,14 @@ private fun TicketsScreen(
                             Button(onClick = { showInboxDisclosure = true }, enabled = !state.smsImporting) {
                                 Text(if (state.smsImporting) "Checking…" else "Check CP SMS")
                             }
-                            OutlinedButton(onClick = { pasteSms = true }, enabled = !state.smsImporting) {
+                            OutlinedButton(
+                                onClick = { pasteSms = true },
+                                enabled = !state.smsImporting,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f)),
+                            ) {
                                 Text("Paste SMS")
                             }
                         }
@@ -1055,9 +1068,7 @@ private fun TicketsScreen(
             }
             val today = LocalDate.now()
             val filteredTickets = state.tickets.filter {
-                val isFuture = runCatching {
-                    !LocalDate.parse(it.serviceDate).isBefore(today)
-                }.getOrDefault(true)
+                val isFuture = it.isUpcoming(today)
                 isFuture == (ticketFilter == TicketFilter.FUTURE)
             }
             val visibleTickets = filteredTickets.take(ticketLimit)
@@ -1191,7 +1202,10 @@ private fun TicketCard(ticket: Ticket, onOpen: () -> Unit, onTrack: () -> Unit, 
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onTrack) { Text("Track") }
-                TextButton(onClick = onDelete) { Text("Delete") }
+                TextButton(
+                    onClick = onDelete,
+                    colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
+                ) { Text("Delete") }
             }
         }
     }
@@ -1557,6 +1571,11 @@ private fun TicketDirection?.labelPrefix(): String = when (this) {
     TicketDirection.RETURN -> "Return · "
     null -> ""
 }
+
+/** A ticket remains upcoming until its known arrival time; service date alone is insufficient. */
+private fun Ticket.isUpcoming(today: LocalDate = LocalDate.now(), nowMillis: Long = System.currentTimeMillis()): Boolean =
+    scheduledArrivalEpochMillis?.let { it > nowMillis }
+        ?: runCatching { !LocalDate.parse(serviceDate).isBefore(today) }.getOrDefault(true)
 
 private fun String.removeAccents(): String = java.text.Normalizer.normalize(this, java.text.Normalizer.Form.NFD)
     .replace(Regex("\\p{M}+"), "")
