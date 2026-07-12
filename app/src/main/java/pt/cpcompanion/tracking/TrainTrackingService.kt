@@ -75,11 +75,17 @@ class TrainTrackingService : Service() {
                     return@launch
                 }
                 try {
+                    val previousPhase = container.stores.tracking.value
+                        ?.takeIf { it.ticketId == ticketId }
+                        ?.phase
                     val trip = container.repository.trip(ticket.trainNumber, LocalDate.parse(ticket.serviceDate))
                     val snapshot = container.resolver.resolve(ticket, trip)
                     failures = 0
                     container.stores.saveTracking(snapshot)
                     updateNotification(snapshot)
+                    if (snapshot.phase.isImportantAlertPhase() && snapshot.phase != previousPhase) {
+                        container.notifications.postImportantAlert(snapshot)
+                    }
                     if (snapshot.phase in setOf(PassengerPhase.ARRIVED, PassengerPhase.CANCELLED)) {
                         delay(3_000)
                         finishSession(snapshot)
@@ -148,6 +154,7 @@ class TrainTrackingService : Service() {
         return TrackingSnapshot(
             ticketId = ticketId,
             trainNumber = ticket?.trainNumber ?: "—",
+            serviceLabel = ticket?.serviceLabel,
             serviceDate = ticket?.serviceDate.orEmpty(),
             phase = PassengerPhase.DATA_UNAVAILABLE,
             originName = ticket?.originName ?: ticket?.originStationCode ?: "Origin",
@@ -164,6 +171,14 @@ class TrainTrackingService : Service() {
         3 -> 90_000L
         else -> 120_000L
     }
+
+    private fun PassengerPhase.isImportantAlertPhase(): Boolean = this in setOf(
+        PassengerPhase.BOARDING_SOON,
+        PassengerPhase.ON_BOARD,
+        PassengerPhase.APPROACHING_DESTINATION,
+        PassengerPhase.ARRIVED,
+        PassengerPhase.CANCELLED,
+    )
 
     companion object {
         const val ACTION_START = "pt.cpcompanion.action.START_TRACKING"
@@ -187,4 +202,3 @@ class TrainTrackingService : Service() {
         }
     }
 }
-

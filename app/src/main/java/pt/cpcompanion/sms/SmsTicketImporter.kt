@@ -22,6 +22,7 @@ class SmsTicketImporter(
 ) {
     private val appContext = context.applicationContext
 
+    @Synchronized
     fun importInbox(
         stations: List<Station>,
         stopAtMessageId: String? = null,
@@ -45,11 +46,12 @@ class SmsTicketImporter(
         // the device.
         val sort = "${Telephony.TextBasedSmsColumns.DATE} DESC"
 
+        val numericCheckpoint = stopAtMessageId?.toLongOrNull()
         appContext.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
             projection,
-            null,
-            null,
+            numericCheckpoint?.let { "${BaseColumns._ID} > ?" },
+            numericCheckpoint?.let { arrayOf(it.toString()) },
             sort,
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(BaseColumns._ID)
@@ -58,10 +60,8 @@ class SmsTicketImporter(
             val dateColumn = cursor.getColumnIndexOrThrow(Telephony.TextBasedSmsColumns.DATE)
             while (cursor.moveToNext() && messages.size < maxMessages) {
                 val messageId = cursor.getLong(idColumn).toString()
-                // The inbox is newest-first. Once we reach the message that
-                // previously produced a ticket, every following SMS is older
-                // and has already been considered. Saved tickets remain in the
-                // app store; this only avoids repeatedly reading old messages.
+                // The provider query normally excludes the checkpoint. Keep
+                // this fallback for devices that ignore the selection.
                 if (messageId == stopAtMessageId) break
                 messages += SmsSourceMessage(
                     id = messageId,
@@ -72,7 +72,9 @@ class SmsTicketImporter(
                 )
             }
         }
-        return importMessages(messages, stations)
+        return importMessages(messages, stations).copy(
+            newestScannedInboxMessageId = messages.firstOrNull()?.id,
+        )
     }
 
     fun importSharedText(text: String, stations: List<Station>): SmsImportResult =
@@ -274,6 +276,7 @@ data class SmsImportResult(
     val candidateMessages: Int,
     val tickets: List<Ticket>,
     val issues: List<String>,
+    val newestScannedInboxMessageId: String? = null,
 ) {
     val newestImportedInboxMessageId: String? = tickets
         .asSequence()

@@ -109,6 +109,8 @@ data class SmsImportSettings(
     val lastScanAtEpochMillis: Long? = null,
     /** The newest inbox SMS that produced a saved CP ticket on the previous scan. */
     val lastImportedInboxMessageId: String? = null,
+    /** Cursor checkpoint so old non-ticket SMS messages are not re-read. */
+    val lastInboxCheckpointMessageId: String? = null,
 )
 
 @Serializable
@@ -149,6 +151,7 @@ enum class PassengerPhase {
 data class TrackingSnapshot(
     val ticketId: String,
     val trainNumber: String,
+    val serviceLabel: String? = null,
     val serviceDate: String,
     val phase: PassengerPhase,
     val originName: String,
@@ -159,6 +162,8 @@ data class TrackingSnapshot(
     val expectedEventEpochMillis: Long? = null,
     val scheduledOriginEpochMillis: Long? = null,
     val expectedOriginEpochMillis: Long? = null,
+    /** ETA at the boarding station, distinct from its ETD. */
+    val expectedOriginArrivalEpochMillis: Long? = null,
     val scheduledDestinationEpochMillis: Long? = null,
     val expectedDestinationEpochMillis: Long? = null,
     val delayMinutes: Int? = null,
@@ -167,6 +172,8 @@ data class TrackingSnapshot(
     val seat: String? = null,
     val progress: Int = 0,
     val progressMax: Int = 1000,
+    /** Calling-point markers, expressed on the 0..progressMax notification line. */
+    val progressMarkers: List<Int> = emptyList(),
     val message: String? = null,
     val updatedAtEpochMillis: Long = System.currentTimeMillis(),
     val consecutiveFailures: Int = 0,

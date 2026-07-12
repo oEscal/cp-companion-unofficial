@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import pt.cpcompanion.MainActivity
 import pt.cpcompanion.R
 import pt.cpcompanion.domain.StatusChipFormatter
@@ -35,8 +36,10 @@ class TrackingNotificationFactory(private val context: Context) {
             },
         )
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ALERTS, context.getString(R.string.alerts_channel_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(CHANNEL_ALERTS, context.getString(R.string.alerts_channel_name), NotificationManager.IMPORTANCE_HIGH).apply {
                 description = context.getString(R.string.alerts_channel_description)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 180, 100, 180)
             },
         )
     }
@@ -49,6 +52,36 @@ class TrackingNotificationFactory(private val context: Context) {
         buildProgressNotification(snapshot)
     } else {
         buildFallback(snapshot)
+    }
+
+    fun postImportantAlert(snapshot: TrackingSnapshot) {
+        val (title, text) = when (snapshot.phase) {
+            PassengerPhase.BOARDING_SOON ->
+                "Train ${snapshot.trainNumber} is almost at ${snapshot.originName}" to
+                    "Boarding shortly${snapshot.platform?.let { " · Platform $it" } ?: ""}"
+            PassengerPhase.ON_BOARD ->
+                "Train ${snapshot.trainNumber} has reached ${snapshot.originName}" to
+                    "Board now${snapshot.carriage?.let { " · Carriage $it" } ?: ""}${snapshot.seat?.let { " · Seat $it" } ?: ""}"
+            PassengerPhase.APPROACHING_DESTINATION ->
+                "Approaching ${snapshot.destinationName}" to
+                    "Train ${snapshot.trainNumber} arrives soon"
+            PassengerPhase.ARRIVED ->
+                "Arrived at ${snapshot.destinationName}" to "Train ${snapshot.trainNumber} has arrived"
+            PassengerPhase.CANCELLED ->
+                "Train ${snapshot.trainNumber} disrupted" to "Check the latest trip details"
+            else -> return
+        }
+        val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
+            .setSmallIcon(iconFor(snapshot.phase))
+            .setContentTitle(title)
+            .setContentText(text)
+            .setContentIntent(openIntent(snapshot.ticketId))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVibrate(longArrayOf(0, 180, 100, 180))
+            .build()
+        NotificationManagerCompat.from(context).notify(ALERT_NOTIFICATION_ID, notification)
     }
 
     private fun buildFallback(snapshot: TrackingSnapshot): Notification {
@@ -84,10 +117,14 @@ class TrackingNotificationFactory(private val context: Context) {
                 listOf(Notification.ProgressStyle.Segment(snapshot.progressMax).setColor(Color.rgb(0, 108, 76))),
             )
             .setProgressPoints(
-                listOf(
-                    Notification.ProgressStyle.Point(0).setColor(Color.rgb(0, 108, 76)),
-                    Notification.ProgressStyle.Point(snapshot.progressMax).setColor(Color.rgb(0, 80, 170)),
-                ),
+                buildList {
+                    add(Notification.ProgressStyle.Point(0).setColor(Color.rgb(0, 108, 76)))
+                    snapshot.progressMarkers.forEach { marker ->
+                        add(Notification.ProgressStyle.Point(marker.coerceIn(1, snapshot.progressMax - 1))
+                            .setColor(Color.rgb(70, 100, 90)))
+                    }
+                    add(Notification.ProgressStyle.Point(snapshot.progressMax).setColor(Color.rgb(0, 80, 170)))
+                },
             )
 
         val extras = Bundle().apply {
@@ -172,11 +209,16 @@ class TrackingNotificationFactory(private val context: Context) {
             )
             PassengerPhase.ON_BOARD, PassengerPhase.APPROACHING_DESTINATION -> NotificationContent(
                 title = "Train ${snapshot.trainNumber} to ${snapshot.destinationName}",
-                text = "Expected ${expected ?: scheduled ?: "calculating"} · $delay",
+                text = listOfNotNull(
+                    "Expected ${expected ?: scheduled ?: "calculating"}",
+                    delay,
+                    boarding.takeIf(String::isNotBlank),
+                ).joinToString(" · "),
                 subtext = snapshot.nextStopName?.let { "Next: $it" },
                 expanded = "Destination: ${snapshot.destinationName}\n" +
                     "Expected ${expected ?: "calculating"}" +
                     (scheduled?.let { " · scheduled $it" } ?: "") + "\n$delay" +
+                    (boarding.takeIf(String::isNotBlank)?.let { "\n$it" } ?: "") +
                     (snapshot.nextStopName?.let { "\nNext stop: $it" } ?: ""),
             )
             PassengerPhase.CANCELLED -> NotificationContent(
@@ -256,8 +298,9 @@ class TrackingNotificationFactory(private val context: Context) {
 
     companion object {
         const val CHANNEL_TRACKING = "trip_tracking"
-        const val CHANNEL_ALERTS = "trip_alerts"
+        const val CHANNEL_ALERTS = "trip_alerts_v2"
         const val NOTIFICATION_ID = 5140
+        const val ALERT_NOTIFICATION_ID = 5141
         const val EXTRA_TICKET_ID = "ticket_id"
         private val FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
     }

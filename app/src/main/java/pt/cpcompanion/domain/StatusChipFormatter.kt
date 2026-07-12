@@ -22,7 +22,19 @@ object StatusChipFormatter {
                 snapshot.carriage?.takeIf(String::isNotBlank)?.let { "C$it" },
                 snapshot.seat?.takeIf(String::isNotBlank),
             ) ?: minutes?.let { "${it}m" }?.takeIf { it.length <= MAX_CRITICAL_TEXT }
-            PassengerPhase.ON_BOARD,
+            PassengerPhase.ON_BOARD -> {
+                val boardingStartedAt = snapshot.expectedOriginArrivalEpochMillis
+                val keepSeatVisible = boardingStartedAt != null &&
+                    nowEpochMillis in boardingStartedAt..(boardingStartedAt + 5 * 60_000L)
+                if (keepSeatVisible) {
+                    compact(
+                        snapshot.carriage?.takeIf(String::isNotBlank)?.let { "C$it" },
+                        snapshot.seat?.takeIf(String::isNotBlank),
+                    )
+                } else {
+                    minutes?.let { "${it}m" }?.takeIf { it.length <= MAX_CRITICAL_TEXT }
+                }
+            }
             PassengerPhase.APPROACHING_DESTINATION -> minutes?.let { "${it}m" }
                 ?.takeIf { it.length <= MAX_CRITICAL_TEXT }
             PassengerPhase.CANCELLED -> "CANCEL"
