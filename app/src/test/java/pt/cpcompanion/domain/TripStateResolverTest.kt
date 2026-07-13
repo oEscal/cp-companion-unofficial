@@ -97,6 +97,53 @@ class TripStateResolverTest {
     }
 
     @Test
+    fun temporarilyMissingDelay_reusesRecentPreviousDelay() {
+        val date = LocalDate.of(2026, 7, 11)
+        val zone = ZoneId.of("Europe/Lisbon")
+        val firstNow = date.atTime(20, 0).atZone(zone).toInstant()
+
+        val delayedTrip = trip(date).copy(
+            overallDelayMinutes = 12,
+            stops = trip(date).stops.map {
+                it.copy(
+                    expectedArrival = null,
+                    expectedDeparture = null,
+                    delayMinutes = null,
+                )
+            },
+            fetchedAtEpochMillis = firstNow.toEpochMilli(),
+        )
+
+        val previous = resolver.resolve(
+            ticket = ticket(date),
+            trip = delayedTrip,
+            now = firstNow,
+        )
+
+        val missingDelayTrip = delayedTrip.copy(
+            overallDelayMinutes = null,
+            fetchedAtEpochMillis = firstNow.plusSeconds(30).toEpochMilli(),
+        )
+
+        val current = resolver.resolve(
+            ticket = ticket(date),
+            trip = missingDelayTrip,
+            now = firstNow.plusSeconds(30),
+            previousSnapshot = previous,
+        )
+
+        assertEquals(12, current.delayMinutes)
+
+        assertEquals(
+            date.atTime(20, 14)
+                .atZone(zone)
+                .toInstant()
+                .toEpochMilli(),
+            current.expectedOriginEpochMillis,
+        )
+    }
+
+    @Test
     fun suppressedIntermediateStop_isDisruptionNotJourneyCancellation() {
         val date = LocalDate.of(2026, 7, 11)
         val stops = trip(date).stops.toMutableList().apply {

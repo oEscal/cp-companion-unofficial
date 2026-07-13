@@ -28,6 +28,42 @@ class StatusChipFormatterTest {
     }
 
     @Test
+    fun onBoardBeforeEffectiveDeparture_keepsCarriageAndSeatVisible() {
+        val effectiveDeparture = now + 2 * 60_000L
+
+        val snapshot = snapshot(
+            phase = PassengerPhase.ON_BOARD,
+            minutes = 42,
+            carriage = "4",
+            seat = "32A",
+            expectedOriginEpochMillis = effectiveDeparture,
+        )
+
+        assertEquals(
+            "C4·32A",
+            StatusChipFormatter.format(snapshot, now),
+        )
+    }
+
+    @Test
+    fun onBoardWithinFiveMinutesAfterDeparture_keepsCarriageAndSeatVisible() {
+        val effectiveDeparture = now - 2 * 60_000L
+
+        val snapshot = snapshot(
+            phase = PassengerPhase.ON_BOARD,
+            minutes = 42,
+            carriage = "4",
+            seat = "32A",
+            expectedOriginEpochMillis = effectiveDeparture,
+        )
+
+        assertEquals(
+            "C4·32A",
+            StatusChipFormatter.format(snapshot, now),
+        )
+    }
+
+    @Test
     fun onBoard_showsDestinationCountdown() {
         assertEquals(
             "42m",
@@ -49,6 +85,7 @@ class StatusChipFormatterTest {
         platform: String? = null,
         carriage: String? = null,
         seat: String? = null,
+        expectedOriginEpochMillis: Long? = null,
     ) = TrackingSnapshot(
         ticketId = "ticket",
         trainNumber = "514",
@@ -57,6 +94,7 @@ class StatusChipFormatterTest {
         originName = "Coimbra-B",
         destinationName = "Lisboa Santa Apolónia",
         expectedEventEpochMillis = now + minutes * 60_000L,
+        expectedOriginEpochMillis = expectedOriginEpochMillis,
         platform = platform,
         carriage = carriage,
         seat = seat,
