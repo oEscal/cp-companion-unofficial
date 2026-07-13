@@ -26,6 +26,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import pt.cpcompanion.domain.StatusChipFormatter
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.automation.TicketActivationLauncher
 import pt.cpcompanion.automation.TicketActivationScheduler
@@ -535,13 +536,20 @@ class TrainTrackingService : Service() {
         else -> 180_000L
     }
 
-    private fun notificationSignature(snapshot: TrackingSnapshot): String = listOf(
+    private fun notificationSignature(
+        snapshot: TrackingSnapshot,
+    ): String = listOf(
         snapshot.phase,
         snapshot.expectedEventEpochMillis,
+        snapshot.expectedOriginEpochMillis,
+        snapshot.expectedDestinationEpochMillis,
         snapshot.delayMinutes,
         snapshot.platform,
+        snapshot.carriage,
+        snapshot.seat,
         snapshot.nextStopName,
         snapshot.progress / 10,
+        StatusChipFormatter.format(snapshot),
         snapshot.dataStale,
         snapshot.retryAtEpochMillis,
         snapshot.message,
