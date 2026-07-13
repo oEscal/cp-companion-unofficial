@@ -19,11 +19,36 @@ import pt.cpcompanion.model.TrainTrip
 class TripResolutionException(message: String) : IllegalArgumentException(message)
 
 class TripStateResolver {
-    fun resolve(ticket: Ticket, trip: TrainTrip, now: Instant = Instant.now()): TrackingSnapshot {
+    fun resolve(
+        ticket: Ticket,
+        trip: TrainTrip,
+        now: Instant = Instant.now(),
+        previousSnapshot: TrackingSnapshot? = null,
+    ): TrackingSnapshot {
         if (ticket.trainNumber != trip.trainNumber) {
             throw TripResolutionException("Ticket and trip train numbers do not match")
         }
-        val resolved = resolveStops(trip)
+        val previousDelayAgeMillis = previousSnapshot
+            ?.takeIf {
+                it.ticketId == ticket.id &&
+                    it.trainNumber == ticket.trainNumber &&
+                    it.serviceDate == ticket.serviceDate
+            }
+            ?.let {
+                now.toEpochMilli() - it.lastSuccessfulFetchEpochMillis
+            }
+
+        val retainedDelayMinutes = previousSnapshot
+            ?.delayMinutes
+            ?.takeIf {
+                previousDelayAgeMillis != null &&
+                    previousDelayAgeMillis in 0L..RETAINED_DELAY_MAX_AGE.toMillis()
+            }
+
+        val resolved = resolveStops(
+            trip = trip,
+            retainedDelayMinutes = retainedDelayMinutes,
+        )
         val originIndex = resolved.indexOfFirst { it.source.station.code == ticket.originStationCode }
         val destinationIndex = resolved.indexOfFirst { it.source.station.code == ticket.destinationStationCode }
         if (originIndex < 0 || destinationIndex < 0) {
@@ -102,8 +127,15 @@ class TripStateResolver {
         val delay = when (phase) {
             PassengerPhase.PRE_TRIP,
             PassengerPhase.APPROACHING_ORIGIN,
-            PassengerPhase.BOARDING_SOON -> origin.source.delayMinutes ?: trip.overallDelayMinutes
-            else -> destination.source.delayMinutes ?: trip.overallDelayMinutes
+            PassengerPhase.BOARDING_SOON ->
+                origin.source.delayMinutes
+                    ?: trip.overallDelayMinutes
+                    ?: retainedDelayMinutes
+
+            else ->
+                destination.source.delayMinutes
+                    ?: trip.overallDelayMinutes
+                    ?: retainedDelayMinutes
         }
         val originInstant = originEventExpected?.toInstant()
         val destinationInstant = destinationExpected?.toInstant()
@@ -226,7 +258,10 @@ class TripStateResolver {
             .sorted()
     }
 
-    private fun resolveStops(trip: TrainTrip): List<ResolvedStop> {
+    private fun resolveStops(
+        trip: TrainTrip,
+        retainedDelayMinutes: Int?,
+    ): List<ResolvedStop> {
         val serviceDate = LocalDate.parse(trip.serviceDate)
         var previous: Instant? = null
         return trip.stops.map { stop ->
@@ -239,7 +274,7 @@ class TripStateResolver {
                 stop.expectedArrival,
                 scheduledArrival,
                 stop.delayMinutes,
-                trip.overallDelayMinutes,
+                trip.overallDelayMinutes ?: retainedDelayMinutes,
                 serviceDate,
                 zone,
             )
@@ -247,7 +282,7 @@ class TripStateResolver {
                 stop.expectedDeparture,
                 scheduledDeparture,
                 stop.delayMinutes,
-                trip.overallDelayMinutes,
+                trip.overallDelayMinutes ?: retainedDelayMinutes,
                 serviceDate,
                 zone,
             )
@@ -271,17 +306,57 @@ class TripStateResolver {
         date: LocalDate,
         zone: ZoneId,
     ): ResolvedExpected {
-        alignExpected(text, scheduled, date, zone)?.let {
-            return ResolvedExpected(it, ExpectedTimeSource.OBSERVED)
+        /*
+        * Priority 1: use the ETA/ETD explicitly supplied by CP.
+        */
+        alignExpected(text, scheduled, date, zone)?.let { observed ->
+            return ResolvedExpected(
+                observed,
+                ExpectedTimeSource.OBSERVED,
+            )
         }
-        if (scheduled == null) return ResolvedExpected(null, ExpectedTimeSource.UNKNOWN)
-        stopDelay?.let {
-            return ResolvedExpected(scheduled.plusMinutes(it.toLong()), ExpectedTimeSource.CALCULATED_FROM_STOP_DELAY)
+
+        if (scheduled == null) {
+            return ResolvedExpected(
+                null,
+                ExpectedTimeSource.UNKNOWN,
+            )
         }
-        overallDelay?.let {
-            return ResolvedExpected(scheduled.plusMinutes(it.toLong()), ExpectedTimeSource.CALCULATED_FROM_TRAIN_DELAY)
+
+        /*
+        * Priority 2: use a meaningful stop-specific delay.
+        *
+        * CP can occasionally return zero for a stop while the train still has
+        * a positive overall delay. In that case the overall delay is a better
+        * fallback than reverting to the scheduled time.
+        */
+        if (
+            stopDelay != null &&
+            (stopDelay != 0 || overallDelay == null)
+        ) {
+            return ResolvedExpected(
+                scheduled.plusMinutes(stopDelay.toLong()),
+                ExpectedTimeSource.CALCULATED_FROM_STOP_DELAY,
+            )
         }
-        return ResolvedExpected(scheduled, ExpectedTimeSource.SCHEDULED_ONLY)
+
+        /*
+        * Priority 3: calculate ETA/ETD from the train's overall delay.
+        */
+        if (overallDelay != null) {
+            return ResolvedExpected(
+                scheduled.plusMinutes(overallDelay.toLong()),
+                ExpectedTimeSource.CALCULATED_FROM_TRAIN_DELAY,
+            )
+        }
+
+        /*
+        * Priority 4: no live delay information is available.
+        */
+        return ResolvedExpected(
+            scheduled,
+            ExpectedTimeSource.SCHEDULED_ONLY,
+        )
     }
 
     private fun resolve(text: String?, date: LocalDate, zone: ZoneId, previous: Instant?): ZonedDateTime? {
@@ -333,6 +408,7 @@ class TripStateResolver {
 
     private companion object {
         val ARRIVAL_TIME_FALLBACK_GRACE: Duration = Duration.ofMinutes(20)
+        val RETAINED_DELAY_MAX_AGE: Duration = Duration.ofMinutes(5)
     }
 
     private data class EventTime(
