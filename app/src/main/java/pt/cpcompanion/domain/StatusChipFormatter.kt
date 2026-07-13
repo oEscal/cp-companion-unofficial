@@ -23,17 +23,35 @@ object StatusChipFormatter {
                 snapshot.seat?.takeIf(String::isNotBlank),
             ) ?: minutes?.let { "${it}m" }?.takeIf { it.length <= MAX_CRITICAL_TEXT }
             PassengerPhase.ON_BOARD -> {
-                val boardingStartedAt =
-                    snapshot.expectedOriginEpochMillis
-                val keepSeatVisible = boardingStartedAt != null &&
-                    nowEpochMillis in boardingStartedAt..(boardingStartedAt + 5 * 60_000L)
+                val effectiveDeparture = snapshot.expectedOriginEpochMillis
+
+                /*
+                * Keep carriage and seat visible from five minutes before the effective
+                * departure until five minutes after it.
+                *
+                * expectedOriginEpochMillis represents ETD, or a calculated departure
+                * based on stop/train delay when ETD is unavailable.
+                */
+                val keepSeatVisible = effectiveDeparture != null &&
+                    nowEpochMillis in
+                        (effectiveDeparture - 3 * 60_000L)..(
+                            effectiveDeparture + 3 * 60_000L
+                        )
+
                 if (keepSeatVisible) {
                     compact(
-                        snapshot.carriage?.takeIf(String::isNotBlank)?.let { "C$it" },
-                        snapshot.seat?.takeIf(String::isNotBlank),
-                    )
+                        snapshot.carriage
+                            ?.takeIf(String::isNotBlank)
+                            ?.let { "C$it" },
+                        snapshot.seat
+                            ?.takeIf(String::isNotBlank),
+                    ) ?: minutes
+                        ?.let { "${it}m" }
+                        ?.takeIf { it.length <= MAX_CRITICAL_TEXT }
                 } else {
-                    minutes?.let { "${it}m" }?.takeIf { it.length <= MAX_CRITICAL_TEXT }
+                    minutes
+                        ?.let { "${it}m" }
+                        ?.takeIf { it.length <= MAX_CRITICAL_TEXT }
                 }
             }
             PassengerPhase.APPROACHING_DESTINATION -> minutes?.let { "${it}m" }

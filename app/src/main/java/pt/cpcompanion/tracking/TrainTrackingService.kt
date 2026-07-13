@@ -170,10 +170,21 @@ class TrainTrackingService : Service() {
                 }
                 try {
                     ticket = resolveStationsIfNeeded(ticket)
-                    val previous = container.stores.tracking.value?.takeIf { it.ticketId == ticketId }
+                    val previous = container.stores.tracking.value
+                        ?.takeIf { it.ticketId == ticketId }
+
                     val previousPhase = previous?.phase
-                    val trip = container.repository.trip(ticket.trainNumber, LocalDate.parse(ticket.serviceDate))
-                    val resolved = container.resolver.resolve(ticket, trip)
+
+                    val trip = container.repository.trip(
+                        ticket.trainNumber,
+                        LocalDate.parse(ticket.serviceDate),
+                    )
+
+                    val resolved = container.resolver.resolve(
+                        ticket = ticket,
+                        trip = trip,
+                        previousSnapshot = previous,
+                    )
                     var snapshot = if (trip.dataStale && previous != null) {
                         failures = maxOf(failures + 1, previous.consecutiveFailures + 1)
                         if (firstFailureAt == null) firstFailureAt = System.currentTimeMillis()
@@ -542,6 +553,7 @@ class TrainTrackingService : Service() {
         snapshot.phase,
         snapshot.expectedEventEpochMillis,
         snapshot.expectedOriginEpochMillis,
+        snapshot.expectedOriginArrivalEpochMillis,
         snapshot.expectedDestinationEpochMillis,
         snapshot.delayMinutes,
         snapshot.platform,
