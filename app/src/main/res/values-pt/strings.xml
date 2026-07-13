@@ -210,4 +210,7 @@
     <string name="notification_permission_required_tracking">A permissão de notificações é necessária para mostrar o acompanhamento automático da viagem.</string>
     <string name="sms_permission_denied_fallback">O acesso aos SMS não foi autorizado; cole ou partilhe a mensagem da CP.</string>
     <string name="sms_permission_required_auto_scan">A análise automática dos SMS da CP requer acesso aos SMS.</string>
+    <string name="live_update_promotion">Promoção da atualização em direto</string>
+    <string name="live_update_promotion_body">Permita que o CP Companion apresente a viagem de comboio como uma atualização em direto promovida, incluindo o indicador na barra de estado.</string>
+    <string name="manage_live_updates">Gerir atualizações em direto</string>
 </resources>

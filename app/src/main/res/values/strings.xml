@@ -210,4 +210,7 @@
     <string name="notification_permission_required_tracking">Notification permission is required for visible automatic trip tracking.</string>
     <string name="sms_permission_denied_fallback">SMS access was not granted; paste or share the CP message instead.</string>
     <string name="sms_permission_required_auto_scan">Automatic CP SMS scanning requires SMS access.</string>
+    <string name="live_update_promotion">Live Update promotion</string>
+    <string name="live_update_promotion_body">Allow CP Companion to display the train journey as a promoted Live Update, including the status-bar chip.</string>
+    <string name="manage_live_updates">Manage Live Updates</string>
 </resources>
