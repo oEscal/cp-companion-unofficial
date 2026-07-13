@@ -48,10 +48,10 @@ class TrackingNotificationFactory(private val context: Context) {
         )
     }
 
-    fun build(snapshot: TrackingSnapshot): Notification = if (
+    fun build(snapshot: TrackingSnapshot): Notification =
+    if (
         Build.VERSION.SDK_INT >= 36 &&
-        snapshot.isLiveUpdateEligible() &&
-        context.getSystemService(NotificationManager::class.java).canPostPromotedNotifications()
+        snapshot.supportsProgressStyle()
     ) {
         buildProgressNotification(snapshot)
     } else {
@@ -165,8 +165,20 @@ class TrackingNotificationFactory(private val context: Context) {
                 },
             )
 
+        val notificationManager =
+            context.getSystemService(NotificationManager::class.java)
+
+        val requestPromotion =
+            snapshot.shouldRequestPromotion() &&
+                notificationManager.canPostPromotedNotifications()
+
         val extras = Bundle().apply {
-            putBoolean(Notification.EXTRA_REQUEST_PROMOTED_ONGOING, true)
+            if (requestPromotion) {
+                putBoolean(
+                    Notification.EXTRA_REQUEST_PROMOTED_ONGOING,
+                    true,
+                )
+            }
         }
         return Notification.Builder(context, CHANNEL_TRACKING)
             .setSmallIcon(iconFor(snapshot.phase))
@@ -353,13 +365,37 @@ class TrackingNotificationFactory(private val context: Context) {
         PassengerPhase.STOPPED,
     )
 
-    private fun TrackingSnapshot.isLiveUpdateEligible(): Boolean = when (phase) {
-        PassengerPhase.BOARDING_SOON,
-        PassengerPhase.ON_BOARD,
-        PassengerPhase.APPROACHING_DESTINATION -> true
-        PassengerPhase.APPROACHING_ORIGIN -> expectedOriginEpochMillis
-            ?.let { it - System.currentTimeMillis() <= 15L * 60L * 1000L } == true
-        else -> false
+    private fun TrackingSnapshot.supportsProgressStyle(): Boolean =
+        when (phase) {
+            PassengerPhase.PRE_TRIP,
+            PassengerPhase.APPROACHING_ORIGIN,
+            PassengerPhase.BOARDING_SOON,
+            PassengerPhase.ON_BOARD,
+            PassengerPhase.APPROACHING_DESTINATION,
+            PassengerPhase.ARRIVED -> true
+
+            PassengerPhase.CANCELLED,
+            PassengerPhase.DATA_UNAVAILABLE,
+            PassengerPhase.STOPPED -> false
+        }
+
+    private fun TrackingSnapshot.shouldRequestPromotion(): Boolean {
+        val now = System.currentTimeMillis()
+
+        return when (phase) {
+            PassengerPhase.BOARDING_SOON,
+            PassengerPhase.ON_BOARD,
+            PassengerPhase.APPROACHING_DESTINATION -> true
+
+            PassengerPhase.APPROACHING_ORIGIN -> {
+                val expectedArrival = expectedEventEpochMillis
+                expectedArrival != null &&
+                    expectedArrival - now in
+                        0L..(15L * 60L * 1000L)
+            }
+
+            else -> false
+        }
     }
 
     private data class NotificationContent(

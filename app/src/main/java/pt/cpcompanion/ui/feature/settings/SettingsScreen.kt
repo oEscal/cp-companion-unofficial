@@ -144,6 +144,25 @@ internal fun SettingsScreen(
         )
     }
 
+    fun openLiveUpdateSettings() {
+        if (Build.VERSION.SDK_INT < 36) return
+
+        runCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS,
+                ).apply {
+                    putExtra(
+                        Settings.EXTRA_APP_PACKAGE,
+                        context.packageName,
+                    )
+                },
+            )
+        }.onFailure {
+            openNotificationSettings()
+        }
+    }
+
     fun openExactAlarmSettings() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             runCatching {
@@ -226,6 +245,49 @@ internal fun SettingsScreen(
                 }
             }
         }
+
+        if (Build.VERSION.SDK_INT >= 36) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        Modifier.padding(18.dp),
+                        verticalArrangement =
+                            Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                R.string.live_update_promotion,
+                            ),
+                            style =
+                                MaterialTheme.typography.titleMedium,
+                        )
+
+                        Text(
+                            stringResource(
+                                R.string.live_update_promotion_body,
+                            ),
+                            color =
+                                MaterialTheme.colorScheme
+                                    .onSurfaceVariant,
+                        )
+
+                        OutlinedButton(
+                            onClick = ::openLiveUpdateSettings,
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.manage_live_updates,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Text(stringResource(R.string.automatic_cp_access), style = MaterialTheme.typography.headlineMedium)
             Text(

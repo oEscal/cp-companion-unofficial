@@ -23,7 +23,8 @@ object StatusChipFormatter {
                 snapshot.seat?.takeIf(String::isNotBlank),
             ) ?: minutes?.let { "${it}m" }?.takeIf { it.length <= MAX_CRITICAL_TEXT }
             PassengerPhase.ON_BOARD -> {
-                val boardingStartedAt = snapshot.expectedOriginArrivalEpochMillis
+                val boardingStartedAt =
+                    snapshot.expectedOriginEpochMillis
                 val keepSeatVisible = boardingStartedAt != null &&
                     nowEpochMillis in boardingStartedAt..(boardingStartedAt + 5 * 60_000L)
                 if (keepSeatVisible) {
