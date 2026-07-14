@@ -26,8 +26,8 @@ object StatusChipFormatter {
                 val effectiveDeparture = snapshot.expectedOriginEpochMillis
 
                 /*
-                * Keep carriage and seat visible from five minutes before the effective
-                * departure until five minutes after it.
+                * Keep carriage and seat visible from three minutes before the effective
+                * departure until three minutes after it.
                 *
                 * expectedOriginEpochMillis represents ETD, or a calculated departure
                 * based on stop/train delay when ETD is unavailable.

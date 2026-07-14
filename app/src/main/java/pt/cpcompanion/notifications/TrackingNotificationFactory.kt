@@ -165,20 +165,20 @@ class TrackingNotificationFactory(private val context: Context) {
                 },
             )
 
-        val notificationManager =
-            context.getSystemService(NotificationManager::class.java)
-
-        val requestPromotion =
-            snapshot.shouldRequestPromotion() &&
-                notificationManager.canPostPromotedNotifications()
+        /*
+        * Always express the app's promotion request when the journey is eligible.
+        *
+        * canPostPromotedNotifications() reports the current Android/user setting,
+        * but it should not decide whether the request is included in the
+        * notification itself.
+        */
+        val requestPromotion = snapshot.shouldRequestPromotion()
 
         val extras = Bundle().apply {
-            if (requestPromotion) {
-                putBoolean(
-                    Notification.EXTRA_REQUEST_PROMOTED_ONGOING,
-                    true,
-                )
-            }
+            putBoolean(
+                Notification.EXTRA_REQUEST_PROMOTED_ONGOING,
+                requestPromotion,
+            )
         }
         return Notification.Builder(context, CHANNEL_TRACKING)
             .setSmallIcon(iconFor(snapshot.phase))
@@ -192,7 +192,7 @@ class TrackingNotificationFactory(private val context: Context) {
             .setCategory(Notification.CATEGORY_NAVIGATION)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setColorized(false)
-            .setExtras(extras)
+            .addExtras(extras)
             .apply {
                 if (!snapshot.phase.isTerminal()) {
                     setDeleteIntent(stopIntent(snapshot.ticketId))
@@ -221,6 +221,77 @@ class TrackingNotificationFactory(private val context: Context) {
         } else {
             context.getString(R.string.promotion_unavailable)
         }
+    }
+
+    /**
+     * Whether this journey phase should currently request Live Update promotion.
+     */
+    fun promotionRequested(
+        snapshot: TrackingSnapshot,
+    ): Boolean =
+        Build.VERSION.SDK_INT >= 36 &&
+            snapshot.shouldRequestPromotion()
+
+    /**
+     * Whether Android currently allows this app to publish promoted notifications.
+     */
+    fun canPostPromotion(): Boolean =
+        Build.VERSION.SDK_INT >= 36 &&
+            context.getSystemService(NotificationManager::class.java)
+                .canPostPromotedNotifications()
+
+    /**
+     * Included in the service notification signature so that the notification is
+     * reposted when promotion eligibility or Android's permission state changes.
+     */
+    fun promotionStateKey(
+        snapshot: TrackingSnapshot,
+    ): String {
+        if (Build.VERSION.SDK_INT < 36) {
+            return "unsupported"
+        }
+
+        val manager =
+            context.getSystemService(NotificationManager::class.java)
+
+        val requested = snapshot.shouldRequestPromotion()
+        val allowed = manager.canPostPromotedNotifications()
+
+        val promoted = runCatching {
+            val flags = manager.activeNotifications
+                .firstOrNull { statusBarNotification ->
+                    statusBarNotification.id == NOTIFICATION_ID
+                }
+                ?.notification
+                ?.flags
+                ?: 0
+
+            flags and Notification.FLAG_PROMOTED_ONGOING != 0
+        }.getOrDefault(false)
+
+        return "$requested|$allowed|$promoted"
+    }
+
+    /**
+     * Checks whether the current tracking notification has actually been promoted
+     * by Android, rather than merely requesting promotion.
+     */
+    @RequiresApi(36)
+    fun isTrackingNotificationPromoted(): Boolean {
+        val manager =
+            context.getSystemService(NotificationManager::class.java)
+
+        return runCatching {
+            val flags = manager.activeNotifications
+                .firstOrNull { statusBarNotification ->
+                    statusBarNotification.id == NOTIFICATION_ID
+                }
+                ?.notification
+                ?.flags
+                ?: 0
+
+            flags and Notification.FLAG_PROMOTED_ONGOING != 0
+        }.getOrDefault(false)
     }
 
     private fun content(snapshot: TrackingSnapshot): NotificationContent {

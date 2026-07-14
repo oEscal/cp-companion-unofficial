@@ -46,8 +46,16 @@ import pt.cpcompanion.notifications.TrackingNotificationFactory
 class TrainTrackingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var trackingJob: Job? = null
+    private var promotionRetryJob: Job? = null
+
     private var currentTicketId: String? = null
     private var lastNotificationSignature: String? = null
+
+    /*
+    * Prevents every tracking poll from scheduling another promotion retry.
+    * One retry is performed for each important journey phase.
+    */
+    private var promotionRetryKey: String? = null
 
     private val container by lazy { (application as TrainTrackerApplication).container }
 
@@ -120,7 +128,10 @@ class TrainTrackingService : Service() {
 
     override fun onDestroy() {
         TrackingSessionRegistry.markStopped(currentTicketId)
+
         trackingJob?.cancel()
+        promotionRetryJob?.cancel()
+
         scope.cancel()
         super.onDestroy()
     }
@@ -283,40 +294,141 @@ class TrainTrackingService : Service() {
         return container.stores.upsertTicket(resolved)
     }
 
-    private fun startInForeground(snapshot: TrackingSnapshot) {
-        val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+    private fun startInForeground(
+        snapshot: TrackingSnapshot,
+    ) {
+        val type =
+            if (Build.VERSION.SDK_INT >= 34) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            } else {
+                0
+            }
+
         ServiceCompat.startForeground(
             this,
             TrackingNotificationFactory.NOTIFICATION_ID,
             container.notifications.build(snapshot),
             type,
         )
-        lastNotificationSignature = notificationSignature(snapshot)
+
+        lastNotificationSignature =
+            notificationSignature(snapshot)
+
+        schedulePromotionRetry(snapshot)
     }
 
     
-    private fun updateNotification(snapshot: TrackingSnapshot, force: Boolean = false): Boolean {
+    private fun updateNotification(
+        snapshot: TrackingSnapshot,
+        force: Boolean = false,
+    ): Boolean {
         val signature = notificationSignature(snapshot)
-        if (!force && signature == lastNotificationSignature) return true
+
         if (
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS,
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                return false
-            }
-        if (!TicketActivationLauncher.notificationsUsable(this)) return false
+            !force &&
+            signature == lastNotificationSignature
+        ) {
+            return true
+        }
+
+        if (
+            Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
+
+        if (!TicketActivationLauncher.notificationsUsable(this)) {
+            return false
+        }
+
         return try {
             NotificationManagerCompat.from(this).notify(
                 TrackingNotificationFactory.NOTIFICATION_ID,
                 container.notifications.build(snapshot),
             )
+
             lastNotificationSignature = signature
+            schedulePromotionRetry(snapshot)
+
             true
         } catch (_: SecurityException) {
             false
+        }
+    }
+
+    /**
+     * Some Android 16 System UI implementations do not immediately surface the
+     * chip after the first promotion request. Repost the same notification once
+     * after a short delay when Android allows promotion but has not yet promoted
+     * the notification.
+     */
+    private fun schedulePromotionRetry(
+        snapshot: TrackingSnapshot,
+    ) {
+        if (
+            !container.notifications
+                .promotionRequested(snapshot) ||
+            !container.notifications
+                .canPostPromotion()
+        ) {
+            promotionRetryJob?.cancel()
+            promotionRetryJob = null
+            promotionRetryKey = null
+            return
+        }
+
+        /*
+        * Retry once for each eligible journey phase. This prevents a retry loop
+        * on every 10–60 second CP polling update.
+        */
+        val retryKey =
+            "${snapshot.ticketId}|${snapshot.phase}"
+
+        if (promotionRetryKey == retryKey) {
+            return
+        }
+
+        promotionRetryKey = retryKey
+
+        promotionRetryJob?.cancel()
+        promotionRetryJob = scope.launch {
+            delay(PROMOTION_RETRY_DELAY_MS)
+
+            if (Build.VERSION.SDK_INT < 36) {
+                return@launch
+            }
+
+            val latestSnapshot =
+                container.stores.tracking.value
+                    ?.takeIf {
+                        it.ticketId == snapshot.ticketId
+                    }
+                    ?: snapshot
+
+            if (
+                !container.notifications
+                    .promotionRequested(latestSnapshot) ||
+                !container.notifications
+                    .canPostPromotion() ||
+                container.notifications
+                    .isTrackingNotificationPromoted()
+            ) {
+                return@launch
+            }
+
+            /*
+            * Force one same-ID update. setOnlyAlertOnce prevents this from
+            * producing another sound or vibration.
+            */
+            updateNotification(
+                snapshot = latestSnapshot,
+                force = true,
+            )
         }
     }
 
@@ -551,6 +663,7 @@ class TrainTrackingService : Service() {
         snapshot: TrackingSnapshot,
     ): String = listOf(
         snapshot.phase,
+        container.notifications.promotionStateKey(snapshot),
         snapshot.expectedEventEpochMillis,
         snapshot.expectedOriginEpochMillis,
         snapshot.expectedOriginArrivalEpochMillis,
@@ -591,6 +704,7 @@ class TrainTrackingService : Service() {
         const val ACTION_STOP = "pt.cpcompanion.action.STOP_TRACKING"
         const val EXTRA_TICKET_ID = "ticket_id"
         private const val MAX_STALE_PERIOD_MS = 20L * 60L * 1000L
+        private const val PROMOTION_RETRY_DELAY_MS = 2_000L
         private const val HEARTBEAT_INTERVAL_MS = 60_000L
 
         fun start(context: Context, ticketId: String) {
