@@ -204,11 +204,20 @@ class TrackingNotificationFactory(private val context: Context) {
                         ).build(),
                     )
                 }
-                snapshot.expectedEventEpochMillis?.takeIf { it > System.currentTimeMillis() }?.let {
-                    setWhen(it)
-                    setShowWhen(true)
+                val shortCriticalText = StatusChipFormatter.format(snapshot)
+                if (shortCriticalText != null) {
+                    // Prefer the app-defined chip value and avoid giving System UI
+                    // two competing status-chip representations.
+                    setShortCriticalText(shortCriticalText)
+                    setShowWhen(false)
+                } else {
+                    snapshot.expectedEventEpochMillis
+                        ?.takeIf { it >= System.currentTimeMillis() + 2 * 60_000L }
+                        ?.let {
+                            setWhen(it)
+                            setShowWhen(true)
+                        }
                 }
-                StatusChipFormatter.format(snapshot)?.let(::setShortCriticalText)
             }
             .build()
     }
@@ -450,24 +459,24 @@ class TrackingNotificationFactory(private val context: Context) {
             PassengerPhase.STOPPED -> false
         }
 
-    private fun TrackingSnapshot.shouldRequestPromotion(): Boolean {
-        val now = System.currentTimeMillis()
-
-        return when (phase) {
+    private fun TrackingSnapshot.shouldRequestPromotion(): Boolean =
+        when (phase) {
+            /*
+             * Tracking is activated at T-60 minutes. Request promotion for the whole
+             * active passenger journey so the status chip can appear immediately,
+             * rather than only during the final 15 minutes before boarding.
+             */
+            PassengerPhase.PRE_TRIP,
+            PassengerPhase.APPROACHING_ORIGIN,
             PassengerPhase.BOARDING_SOON,
             PassengerPhase.ON_BOARD,
             PassengerPhase.APPROACHING_DESTINATION -> true
 
-            PassengerPhase.APPROACHING_ORIGIN -> {
-                val expectedArrival = expectedEventEpochMillis
-                expectedArrival != null &&
-                    expectedArrival - now in
-                        0L..(15L * 60L * 1000L)
-            }
-
-            else -> false
+            PassengerPhase.ARRIVED,
+            PassengerPhase.CANCELLED,
+            PassengerPhase.DATA_UNAVAILABLE,
+            PassengerPhase.STOPPED -> false
         }
-    }
 
     private data class NotificationContent(
         val title: String,

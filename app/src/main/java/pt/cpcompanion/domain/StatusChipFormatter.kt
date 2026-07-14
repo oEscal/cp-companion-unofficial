@@ -5,7 +5,7 @@ import pt.cpcompanion.model.TrackingSnapshot
 
 /** Builds the compact value used by an Android 16 Live Update status chip. */
 object StatusChipFormatter {
-    private const val MAX_CRITICAL_TEXT = 7
+    private const val MAX_CRITICAL_TEXT = 6
 
     fun format(snapshot: TrackingSnapshot, nowEpochMillis: Long = System.currentTimeMillis()): String? {
         val minutes = snapshot.expectedEventEpochMillis?.let { expected ->
