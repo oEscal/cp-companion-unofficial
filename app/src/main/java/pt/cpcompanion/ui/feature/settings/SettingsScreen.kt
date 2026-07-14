@@ -131,9 +131,21 @@ internal fun SettingsScreen(
 ) {
     val context = LocalContext.current
     var notificationAccessEnabled by remember { mutableStateOf(isNotificationListenerEnabled(context)) }
+    var liveUpdatePromotionAllowed by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < 36 ||
+                context.getSystemService(android.app.NotificationManager::class.java)
+                    .canPostPromotedNotifications(),
+        )
+    }
     var showNotificationDisclosure by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         notificationAccessEnabled = isNotificationListenerEnabled(context)
+        if (Build.VERSION.SDK_INT >= 36) {
+            liveUpdatePromotionAllowed =
+                context.getSystemService(android.app.NotificationManager::class.java)
+                    .canPostPromotedNotifications()
+        }
     }
 
     fun openNotificationSettings() {
@@ -263,6 +275,19 @@ internal fun SettingsScreen(
                             ),
                             style =
                                 MaterialTheme.typography.titleMedium,
+                        )
+
+                        Text(
+                            stringResource(
+                                if (liveUpdatePromotionAllowed) {
+                                    R.string.promotion_allowed
+                                } else {
+                                    R.string.promotion_unavailable
+                                },
+                            ),
+                            color =
+                                MaterialTheme.colorScheme
+                                    .onSurfaceVariant,
                         )
 
                         Text(
