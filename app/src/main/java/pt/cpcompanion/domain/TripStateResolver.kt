@@ -187,7 +187,10 @@ class TripStateResolver {
             carriage = ticket.carriage,
             seat = ticket.seat,
             progress = timeProgress(progressStart, progressEnd, now),
-            progressMarkers = markerPositions(markerStops, progressStart, progressEnd),
+            // Space calling points by route order rather than by timetable duration.
+            // Closely timed or duplicated CP timestamps otherwise map several points to
+            // the same physical pixel in Android's fixed-width notification progress bar.
+            progressMarkers = markerPositions(markerStops.size),
             message = disruptionMessage ?: staleMessage,
             lastSuccessfulFetchEpochMillis = trip.fetchedAtEpochMillis,
             lastAttemptEpochMillis = if (trip.dataStale) System.currentTimeMillis() else trip.fetchedAtEpochMillis,
@@ -238,23 +241,23 @@ class TripStateResolver {
         return (elapsed * 1000L / duration).toInt()
     }
 
-    private fun markerPositions(stops: List<ResolvedStop>, start: Instant?, end: Instant?): List<Int> {
-        if (start == null || end == null || !end.isAfter(start) || stops.isEmpty()) return emptyList()
-        val duration = Duration.between(start, end).toMillis()
-        var previous = 0
-        return stops.mapIndexed { index, stop ->
-            val event = (stop.expectedArrival ?: stop.expectedDeparture
-                ?: stop.scheduledArrival ?: stop.scheduledDeparture)?.toInstant()
-            val timeBased = event
-                ?.takeIf { it.isAfter(start) && it.isBefore(end) }
-                ?.let { (Duration.between(start, it).toMillis() * 1000L / duration).toInt() }
-            val proportional = ((index + 1L) * 1000L / (stops.size + 1L)).toInt()
-            val remaining = stops.size - index - 1
-            val position = (timeBased ?: proportional)
-                .coerceAtLeast(previous + 1)
-                .coerceAtMost(999 - remaining)
-            previous = position
-            position
+    /**
+     * Places every intermediate passenger stop at an evenly spaced position.
+     *
+     * ProgressStyle positions are logical units that Android later maps onto a fairly short
+     * fixed-width line. Merely making timetable-derived positions numerically distinct is not
+     * enough: values such as 620, 621, and 622 can all round to the same screen pixel and their
+     * squares overlap. Route-order spacing guarantees the largest possible visual separation
+     * while preserving every stop in the correct order.
+     */
+    private fun markerPositions(stopCount: Int): List<Int> {
+        if (stopCount <= 0) return emptyList()
+        val divisor = stopCount + 1L
+        return (1..stopCount).map { index ->
+            // Integer rounding, rather than truncation, keeps the distribution symmetric.
+            ((index * 1000L + divisor / 2L) / divisor)
+                .toInt()
+                .coerceIn(1, 999)
         }
     }
 
