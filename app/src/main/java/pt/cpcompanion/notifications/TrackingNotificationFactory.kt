@@ -13,6 +13,7 @@ import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -142,28 +143,66 @@ class TrackingNotificationFactory(private val context: Context) {
         val content = content(snapshot)
         val progressMax = snapshot.progressMax.coerceAtLeast(2)
         val progress = snapshot.progress.coerceIn(0, progressMax)
-        val pointPositions = buildSet {
-            add(1)
-            snapshot.progressMarkers.forEach { marker -> add(marker.coerceIn(1, progressMax - 1)) }
-            add(progressMax)
+        val pointPositions = visiblePointPositions(
+            markers = snapshot.progressMarkers,
+            progressMax = progressMax,
+        )
+        logPointLayoutIfChanged(
+            snapshot = snapshot,
+            pointPositions = pointPositions,
+            progress = progress,
+            progressMax = progressMax,
+            usesAllStopsWorkaround = pointPositions.size > MAX_RELIABLY_RENDERED_NATIVE_POINTS,
+        )
+        val useAllStopsWorkaround = pointPositions.size > MAX_RELIABLY_RENDERED_NATIVE_POINTS
+        val styleProgress = if (useAllStopsWorkaround) progressMax else progress
+        val progressPoints = pointPositions.mapIndexed { index, position ->
+            Notification.ProgressStyle.Point(position)
+                // Keep point IDs in a namespace separate from segment IDs. IDs are
+                // used by System UI to correlate elements across notification updates.
+                .setId(PROGRESS_POINT_ID_BASE + index)
+                .setColor(
+                    when {
+                        position == progressMax && progress >= progressMax -> PROGRESS_DESTINATION_REACHED_COLOR
+                        position == progressMax -> PROGRESS_DESTINATION_COLOR
+                        position <= progress -> PROGRESS_COMPLETED_STOP_COLOR
+                        else -> PROGRESS_REMAINING_STOP_COLOR
+                    },
+                )
+        }.toMutableList().apply {
+            if (useAllStopsWorkaround && progress in 1 until progressMax) {
+                /*
+                 * Several Android 16 System UI builds clip progress points after the
+                 * tracker position when a route contains many points. Setting the style's
+                 * progress to the maximum makes System UI lay out the complete point list.
+                 * The actual train position is retained as this highlighted point and by
+                 * the completed/remaining segment-color boundary below.
+                 */
+                add(
+                    Notification.ProgressStyle.Point(progress)
+                        .setId(PROGRESS_CURRENT_POSITION_POINT_ID)
+                        .setColor(PROGRESS_CURRENT_POSITION_COLOR),
+                )
+            }
         }
+
         val style = Notification.ProgressStyle()
-            .setStyledByProgress(true)
-            .setProgress(progress)
-            .setProgressTrackerIcon(Icon.createWithResource(context, iconFor(snapshot.phase)))
+            .setStyledByProgress(false)
+            .setProgress(styleProgress)
             .setProgressSegments(
-                listOf(Notification.ProgressStyle.Segment(progressMax).setColor(Color.rgb(0, 108, 76))),
+                progressSegments(
+                    progress = progress,
+                    progressMax = progressMax,
+                ),
             )
-            .setProgressPoints(
-                pointPositions.sorted().map { position ->
-                    val color = when (position) {
-                        1 -> Color.rgb(0, 108, 76)
-                        progressMax -> Color.rgb(0, 80, 170)
-                        else -> Color.rgb(70, 100, 90)
-                    }
-                    Notification.ProgressStyle.Point(position).setColor(color)
-                },
-            )
+            .setProgressPoints(progressPoints)
+            .apply {
+                if (!useAllStopsWorkaround) {
+                    setProgressTrackerIcon(
+                        Icon.createWithResource(context, iconFor(snapshot.phase)),
+                    )
+                }
+            }
 
         /*
         * Always express the app's promotion request when the journey is eligible.
@@ -435,6 +474,85 @@ class TrackingNotificationFactory(private val context: Context) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
+
+    private fun logPointLayoutIfChanged(
+        snapshot: TrackingSnapshot,
+        pointPositions: List<Int>,
+        progress: Int,
+        progressMax: Int,
+        usesAllStopsWorkaround: Boolean,
+    ) {
+        val signature = "$progressMax|${pointPositions.joinToString(",")}|$usesAllStopsWorkaround"
+        if (pointLayoutSignatures.put(snapshot.ticketId, signature) == signature) return
+
+        Log.i(
+            TAG,
+            "ProgressStyle route ticket=${snapshot.ticketId} train=${snapshot.trainNumber} " +
+                "points=${pointPositions.size} positions=$pointPositions " +
+                "progress=$progress/$progressMax allStopsWorkaround=$usesAllStopsWorkaround " +
+                "styleProgress=${if (usesAllStopsWorkaround) progressMax else progress}",
+        )
+    }
+
+
+    @RequiresApi(36)
+    private fun progressSegments(
+        progress: Int,
+        progressMax: Int,
+    ): List<Notification.ProgressStyle.Segment> = buildList {
+        /*
+         * Explicit colors preserve the completed/remaining distinction even when
+         * the long-route workaround reports full style progress to System UI.
+         */
+        if (progress > 0) {
+            add(
+                Notification.ProgressStyle.Segment(progress)
+                    .setId(PROGRESS_COMPLETED_SEGMENT_ID)
+                    .setColor(PROGRESS_COMPLETED_LINE_COLOR),
+            )
+        }
+        if (progress < progressMax) {
+            add(
+                Notification.ProgressStyle.Segment(progressMax - progress)
+                    .setId(PROGRESS_REMAINING_SEGMENT_ID)
+                    .setColor(PROGRESS_REMAINING_LINE_COLOR),
+            )
+        }
+    }
+
+
+    /**
+     * Returns origin, every intermediate calling point, and destination.
+     *
+     * Positions 1 and progressMax are reserved for the passenger origin and
+     * destination. Intermediate positions are kept strictly increasing so no stop is
+     * lost when the API returns equal or very closely spaced times.
+     */
+    private fun visiblePointPositions(
+        markers: List<Int>,
+        progressMax: Int,
+    ): List<Int> {
+        if (progressMax <= 2) return listOf(1, progressMax).distinct()
+
+        val sortedMarkers = markers.sorted()
+        val lastIntermediatePosition = progressMax - 1
+        var previous = 1
+        val normalizedMarkers = sortedMarkers.mapIndexed { index, rawPosition ->
+            val remaining = sortedMarkers.lastIndex - index
+            val position = rawPosition
+                .coerceAtLeast(previous + 1)
+                .coerceAtMost(lastIntermediatePosition - remaining)
+            previous = position
+            position
+        }
+
+        return buildList(normalizedMarkers.size + 2) {
+            add(1)
+            addAll(normalizedMarkers)
+            add(progressMax)
+        }
+    }
+
     private fun formatTime(epochMillis: Long, zoneId: String): String = FORMATTER.format(
         Instant.ofEpochMilli(epochMillis).atZone(runCatching { ZoneId.of(zoneId) }.getOrDefault(ZoneId.of("Europe/Lisbon"))),
     )
@@ -494,7 +612,21 @@ class TrackingNotificationFactory(private val context: Context) {
         const val EXTRA_TICKET_ID = "ticket_id"
         private const val TRACKING_NOTIFICATION_NAMESPACE = 0x10000000
         private const val ALERT_NOTIFICATION_NAMESPACE = 0x20000000
+        private const val TAG = "TrackingNotification"
         private const val NOTIFICATION_ID_HASH_MASK = 0x0fffffff
+        private const val MAX_RELIABLY_RENDERED_NATIVE_POINTS = 4
+        private const val PROGRESS_COMPLETED_SEGMENT_ID = 10_000
+        private const val PROGRESS_REMAINING_SEGMENT_ID = 10_001
+        private const val PROGRESS_POINT_ID_BASE = 20_000
+        private const val PROGRESS_CURRENT_POSITION_POINT_ID = 30_000
+        private val PROGRESS_COMPLETED_LINE_COLOR = Color.rgb(0, 80, 170)
+        private val PROGRESS_REMAINING_LINE_COLOR = Color.rgb(120, 145, 175)
+        private val PROGRESS_COMPLETED_STOP_COLOR = Color.rgb(0, 65, 145)
+        private val PROGRESS_REMAINING_STOP_COLOR = Color.rgb(95, 120, 150)
+        private val PROGRESS_CURRENT_POSITION_COLOR = Color.rgb(220, 75, 45)
+        private val PROGRESS_DESTINATION_COLOR = Color.rgb(0, 80, 170)
+        private val PROGRESS_DESTINATION_REACHED_COLOR = Color.rgb(0, 110, 75)
+        private val pointLayoutSignatures = java.util.concurrent.ConcurrentHashMap<String, String>()
 
         fun notificationIdFor(ticketId: String): Int =
             TRACKING_NOTIFICATION_NAMESPACE or (ticketId.hashCode() and NOTIFICATION_ID_HASH_MASK)

@@ -233,7 +233,47 @@ class TripStateResolverTest {
         )
 
         assertEquals(10, snapshot.progressMarkers.size)
+        assertEquals(
+            listOf(91, 182, 273, 364, 455, 545, 636, 727, 818, 909),
+            snapshot.progressMarkers,
+        )
         assertTrue(snapshot.progressMarkers.zipWithNext().all { (left, right) -> left < right })
+    }
+
+    @Test
+    fun progressMarkersStaySeparatedWhenLaterStopTimesAreClustered() {
+        val date = LocalDate.of(2026, 7, 11)
+        val zone = ZoneId.of("Europe/Lisbon")
+        val times = listOf(
+            "20:00", "20:10", "20:20", "20:30", "20:40", "20:41",
+            "20:41", "20:41", "20:42", "20:42", "20:43", "21:00",
+        )
+        val stops = times.mapIndexed { index, time ->
+            TrainStop(
+                station = StationRef("C$index", "Clustered $index"),
+                scheduledArrival = if (index == 0) null else time,
+                scheduledDeparture = if (index == times.lastIndex) null else time,
+            )
+        }
+
+        val snapshot = resolver.resolve(
+            ticket = ticket(date).copy(
+                originStationCode = "C0",
+                destinationStationCode = "C11",
+                originName = "Clustered 0",
+                destinationName = "Clustered 11",
+            ),
+            trip = trip(date).copy(stops = stops, overallDelayMinutes = 0),
+            now = date.atTime(19, 30).atZone(zone).toInstant(),
+        )
+
+        assertEquals(
+            listOf(91, 182, 273, 364, 455, 545, 636, 727, 818, 909),
+            snapshot.progressMarkers,
+        )
+        assertTrue(
+            snapshot.progressMarkers.zipWithNext().all { (left, right) -> right - left >= 90 },
+        )
     }
 
     @Test(expected = TripResolutionException::class)
