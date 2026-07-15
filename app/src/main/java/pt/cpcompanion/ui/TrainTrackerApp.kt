@@ -44,6 +44,10 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -83,7 +87,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -119,6 +122,7 @@ import pt.cpcompanion.model.TrackingSnapshot
 import pt.cpcompanion.model.TrainServiceEntry
 import pt.cpcompanion.model.TrainTrip
 import pt.cpcompanion.model.isPastPassengerSegment
+import pt.cpcompanion.model.normalizeSearchText
 import pt.cpcompanion.ui.feature.tickets.TicketsScreen
 import pt.cpcompanion.ui.theme.CpExpressiveTheme
 
@@ -512,23 +516,225 @@ internal fun ServiceDateField(
     }
 }
 
+internal data class SearchableDropdownOption(
+    val key: String,
+    val label: String,
+    val searchText: String = label,
+)
+
 @Composable
-internal fun ManualTicketDialog(onDismiss: () -> Unit, onSave: (Ticket) -> Unit) {
-    var train by rememberSaveable { mutableStateOf("") }
+internal fun SearchableDropdownField(
+    label: String,
+    selectedKey: String?,
+    options: List<SearchableDropdownOption>,
+    onSelected: (SearchableDropdownOption?) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    supportingText: String? = null,
+    stateKey: Any? = Unit,
+    minimumQueryLength: Int = 0,
+    maximumDisplayedOptions: Int = 100,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = options.firstOrNull { it.key == selectedKey }
+    var query by rememberSaveable(stateKey) { mutableStateOf(selected?.label.orEmpty()) }
+
+    LaunchedEffect(selected?.label) {
+        if (selected != null && query != selected.label) query = selected.label
+    }
+
+    val normalizedQuery = normalizeSearchText(query)
+    val queryIsLongEnough = normalizedQuery.length >= minimumQueryLength
+    val filtered = remember(
+        options,
+        normalizedQuery,
+        minimumQueryLength,
+        maximumDisplayedOptions,
+    ) {
+        if (normalizedQuery.length < minimumQueryLength) {
+            emptyList()
+        } else {
+            options.asSequence()
+                .filter { option ->
+                    normalizedQuery.isBlank() ||
+                        normalizeSearchText(option.label).contains(normalizedQuery) ||
+                        normalizeSearchText(option.searchText).contains(normalizedQuery) ||
+                        normalizeSearchText(option.key).contains(normalizedQuery)
+                }
+                .take(maximumDisplayedOptions.coerceAtLeast(1))
+                .toList()
+        }
+    }
+    val menuExpanded = expanded && enabled && queryIsLongEnough
+
+    ExposedDropdownMenuBox(
+        expanded = menuExpanded,
+        onExpandedChange = { requestedExpanded ->
+            if (enabled) expanded = requestedExpanded && queryIsLongEnough
+        },
+        modifier = modifier,
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { value ->
+                query = value
+                if (selected?.label != value) onSelected(null)
+                expanded = normalizeSearchText(value).length >= minimumQueryLength
+            },
+            label = { Text(label) },
+            supportingText = supportingText?.let { text -> { Text(text) } },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuExpanded) },
+            singleLine = true,
+            enabled = enabled,
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            filtered.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        query = option.label
+                        onSelected(option)
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
+            }
+            if (filtered.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.no_matching_options)) },
+                    onClick = {},
+                    enabled = false,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ManualTicketDialog(
+    trains: List<TrainServiceEntry>,
+    viewModel: MainViewModel,
+    onDismiss: () -> Unit,
+    onSave: (Ticket) -> Unit,
+) {
+    var selectedTrainKey by rememberSaveable { mutableStateOf<String?>(null) }
     var date by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    var origin by rememberSaveable { mutableStateOf("") }
-    var destination by rememberSaveable { mutableStateOf("") }
+    var selectedOriginCode by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedDestinationCode by rememberSaveable { mutableStateOf<String?>(null) }
     var carriage by rememberSaveable { mutableStateOf("") }
     var seat by rememberSaveable { mutableStateOf("") }
+    var route by remember { mutableStateOf<TrainTrip?>(null) }
+    var routeLoading by remember { mutableStateOf(false) }
+
+    val trainOptions = remember(trains) {
+        trains.map { train ->
+            val routeLabel = listOfNotNull(train.origin?.name, train.destination?.name)
+                .joinToString(" → ")
+                .takeIf(String::isNotBlank)
+            SearchableDropdownOption(
+                key = train.key,
+                label = buildString {
+                    append(train.trainNumber)
+                    train.serviceName?.takeIf(String::isNotBlank)?.let { append(" · ").append(it) }
+                    routeLabel?.let { append(" · ").append(it) }
+                },
+                searchText = listOfNotNull(
+                    train.trainNumber,
+                    train.serviceCode,
+                    train.serviceName,
+                    train.origin?.name,
+                    train.origin?.code,
+                    train.destination?.name,
+                    train.destination?.code,
+                ).joinToString(" "),
+            )
+        }
+    }
+    val selectedTrain = trains.firstOrNull { it.key == selectedTrainKey }
+
+    LaunchedEffect(selectedTrain?.trainNumber, date) {
+        route = null
+        routeLoading = false
+        selectedOriginCode = null
+        selectedDestinationCode = null
+        val trainNumber = selectedTrain?.trainNumber ?: return@LaunchedEffect
+        routeLoading = true
+        route = viewModel.loadTripForTicketForm(trainNumber, date)
+        routeLoading = false
+    }
+
+    val stops = route?.stops.orEmpty()
+    val originOptions = stops.dropLast(1).map { stop ->
+        SearchableDropdownOption(
+            key = stop.station.code,
+            label = stop.station.name,
+            searchText = "${stop.station.name} ${stop.station.code}",
+        )
+    }
+    val originIndex = stops.indexOfFirst { it.station.code == selectedOriginCode }
+    val destinationOptions = if (originIndex >= 0) {
+        stops.drop(originIndex + 1).map { stop ->
+            SearchableDropdownOption(
+                key = stop.station.code,
+                label = stop.station.name,
+                searchText = "${stop.station.name} ${stop.station.code}",
+            )
+        }
+    } else {
+        emptyList()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.add_future_ticket)) },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { OutlinedTextField(train, { train = it }, label = { Text(stringResource(R.string.train_number_label)) }, singleLine = true) }
+                item {
+                    SearchableDropdownField(
+                        label = stringResource(R.string.train_number_label),
+                        selectedKey = selectedTrainKey,
+                        options = trainOptions,
+                        onSelected = { option -> selectedTrainKey = option?.key },
+                        supportingText = stringResource(R.string.type_two_characters_to_search_trains),
+                        minimumQueryLength = 2,
+                        maximumDisplayedOptions = 30,
+                    )
+                }
                 item { ServiceDateField(date, { date = it }, stringResource(R.string.service_date)) }
-                item { OutlinedTextField(origin, { origin = it }, label = { Text(stringResource(R.string.origin_station_code)) }, singleLine = true) }
-                item { OutlinedTextField(destination, { destination = it }, label = { Text(stringResource(R.string.destination_station_code)) }, singleLine = true) }
+                item {
+                    SearchableDropdownField(
+                        label = stringResource(R.string.origin_station),
+                        selectedKey = selectedOriginCode,
+                        options = originOptions,
+                        onSelected = { option ->
+                            selectedOriginCode = option?.key
+                            selectedDestinationCode = null
+                        },
+                        enabled = route != null && !routeLoading,
+                        supportingText = when {
+                            routeLoading -> stringResource(R.string.loading_train_route)
+                            selectedTrain != null && route == null -> stringResource(R.string.train_route_unavailable)
+                            else -> null
+                        },
+                        stateKey = "${selectedTrainKey.orEmpty()}|$date",
+                    )
+                }
+                item {
+                    SearchableDropdownField(
+                        label = stringResource(R.string.destination_station),
+                        selectedKey = selectedDestinationCode,
+                        options = destinationOptions,
+                        onSelected = { option -> selectedDestinationCode = option?.key },
+                        enabled = selectedOriginCode != null && destinationOptions.isNotEmpty(),
+                        stateKey = selectedOriginCode,
+                    )
+                }
                 item { OutlinedTextField(carriage, { carriage = it }, label = { Text(stringResource(R.string.carriage)) }, singleLine = true) }
                 item { OutlinedTextField(seat, { seat = it }, label = { Text(stringResource(R.string.seat)) }, singleLine = true) }
             }
@@ -536,19 +742,27 @@ internal fun ManualTicketDialog(onDismiss: () -> Unit, onSave: (Ticket) -> Unit)
         confirmButton = {
             Button(
                 onClick = {
+                    val train = selectedTrain ?: return@Button
+                    val selectedRoute = route ?: return@Button
+                    val origin = selectedRoute.stops.first { it.station.code == selectedOriginCode }
+                    val destination = selectedRoute.stops.first { it.station.code == selectedDestinationCode }
                     onSave(
                         Ticket(
                             id = UUID.randomUUID().toString(),
-                            trainNumber = train.trim(),
-                            serviceDate = date.trim(),
-                            originStationCode = origin.trim(),
-                            destinationStationCode = destination.trim(),
+                            trainNumber = train.trainNumber,
+                            serviceLabel = selectedRoute.serviceName ?: train.serviceName,
+                            serviceDate = date,
+                            originStationCode = origin.station.code,
+                            destinationStationCode = destination.station.code,
+                            originName = origin.station.name,
+                            destinationName = destination.station.name,
                             carriage = carriage.trim().ifBlank { null },
                             seat = seat.trim().ifBlank { null },
                         ),
                     )
                 },
-                enabled = train.isNotBlank() && origin.isNotBlank() && destination.isNotBlank(),
+                enabled = selectedTrain != null && route != null &&
+                    selectedOriginCode != null && selectedDestinationCode != null,
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },

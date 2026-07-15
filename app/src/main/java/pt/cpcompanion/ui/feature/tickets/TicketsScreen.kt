@@ -171,7 +171,14 @@ fun TicketsScreen(
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
         )
     }
-    if (add) ManualTicketDialog({ add = false }) { ticket -> viewModel.saveTicket(ticket); add = false }
+    if (add) {
+        ManualTicketDialog(
+            trains = state.trains,
+            viewModel = viewModel,
+            onDismiss = { add = false },
+            onSave = { ticket -> viewModel.saveTicket(ticket); add = false },
+        )
+    }
     if (pasteSms) {
         SmsPasteDialog(
             onDismiss = { pasteSms = false },

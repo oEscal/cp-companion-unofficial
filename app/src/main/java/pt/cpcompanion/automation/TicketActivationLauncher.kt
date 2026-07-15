@@ -24,7 +24,7 @@ object TicketActivationLauncher {
         stores.awaitReady()
         val ticket = stores.ticket(ticketId) ?: return Result.FAILED
         if (!ticket.automaticTrackingEnabled) return Result.FAILED
-        if (ticket.hasScheduledPassengerSegmentEnded() && stores.activeTicketId.value != ticketId) {
+        if (ticket.hasScheduledPassengerSegmentEnded() && ticketId !in stores.activeTicketIds.value) {
             TicketActivationScheduler.cancel(context, ticketId)
             stores.updateTicket(ticketId) { current ->
                 current.copy(
@@ -49,15 +49,7 @@ object TicketActivationLauncher {
             return Result.BLOCKED_PERMISSION
         }
 
-        if (!stores.claimActiveTicket(ticketId)) {
-            stores.updateAutomation(
-                ticketId,
-                TicketAutomationState.CONFLICT_WITH_OTHER_TRIP,
-                message = "Queued behind another active passenger journey",
-            )
-            TicketAutomationReconciler.enqueue(context)
-            return Result.CONFLICT
-        }
+        stores.claimActiveTicket(ticketId)
         if (!TrackingSessionRegistry.tryClaimLaunch(ticketId)) return Result.ALREADY_RUNNING
 
         stores.updateAutomation(
@@ -71,7 +63,7 @@ object TicketActivationLauncher {
             Result.STARTED
         } catch (error: SecurityException) {
             TrackingSessionRegistry.markStopped(ticketId)
-            stores.clearTracking()
+            stores.clearTracking(ticketId)
             stores.updateAutomation(
                 ticketId,
                 TicketAutomationState.FAILED,
@@ -80,7 +72,7 @@ object TicketActivationLauncher {
             Result.FAILED
         } catch (error: RuntimeException) {
             TrackingSessionRegistry.markStopped(ticketId)
-            stores.clearTracking()
+            stores.clearTracking(ticketId)
             val category = if (error.javaClass.name.endsWith("ForegroundServiceStartNotAllowedException")) {
                 "Android blocked background foreground-service startup"
             } else {

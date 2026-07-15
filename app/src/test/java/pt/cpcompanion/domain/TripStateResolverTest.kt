@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import pt.cpcompanion.model.PassengerPhase
 import pt.cpcompanion.model.StationRef
@@ -207,6 +208,32 @@ class TripStateResolverTest {
         assertEquals(live.phase, unavailable.phase)
         assertEquals(live.lastSuccessfulFetchEpochMillis, unavailable.lastSuccessfulFetchEpochMillis)
         assertEquals(2, unavailable.consecutiveFailures)
+    }
+
+    @Test
+    fun progressLineContainsEveryPassengerCallingPoint() {
+        val date = LocalDate.of(2026, 7, 11)
+        val zone = ZoneId.of("Europe/Lisbon")
+        val stops = (0 until 12).map { index ->
+            TrainStop(
+                station = StationRef("S$index", "Station $index"),
+                scheduledArrival = if (index == 0) null else "%02d:%02d".format(20 + (index * 5) / 60, (index * 5) % 60),
+                scheduledDeparture = if (index == 11) null else "%02d:%02d".format(20 + (index * 5) / 60, (index * 5) % 60),
+            )
+        }
+        val snapshot = resolver.resolve(
+            ticket = ticket(date).copy(
+                originStationCode = "S0",
+                destinationStationCode = "S11",
+                originName = "Station 0",
+                destinationName = "Station 11",
+            ),
+            trip = trip(date).copy(stops = stops, overallDelayMinutes = 0),
+            now = date.atTime(19, 30).atZone(zone).toInstant(),
+        )
+
+        assertEquals(10, snapshot.progressMarkers.size)
+        assertTrue(snapshot.progressMarkers.zipWithNext().all { (left, right) -> left < right })
     }
 
     @Test(expected = TripResolutionException::class)
