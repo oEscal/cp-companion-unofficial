@@ -104,7 +104,7 @@ class TrackingNotificationFactory(private val context: Context) {
         if (!notificationManager.areNotificationsEnabled()) return
 
         try {
-            notificationManager.notify(ALERT_NOTIFICATION_ID, notification)
+            notificationManager.notify(alertNotificationIdFor(snapshot.ticketId), notification)
         } catch (_: SecurityException) {
             // Permission or notification policy changed between the check and notify().
         }
@@ -269,7 +269,7 @@ class TrackingNotificationFactory(private val context: Context) {
         val promoted = runCatching {
             val flags = manager.activeNotifications
                 .firstOrNull { statusBarNotification ->
-                    statusBarNotification.id == NOTIFICATION_ID
+                    statusBarNotification.id == notificationIdFor(snapshot.ticketId)
                 }
                 ?.notification
                 ?.flags
@@ -286,14 +286,14 @@ class TrackingNotificationFactory(private val context: Context) {
      * by Android, rather than merely requesting promotion.
      */
     @RequiresApi(36)
-    fun isTrackingNotificationPromoted(): Boolean {
+    fun isTrackingNotificationPromoted(ticketId: String): Boolean {
         val manager =
             context.getSystemService(NotificationManager::class.java)
 
         return runCatching {
             val flags = manager.activeNotifications
                 .firstOrNull { statusBarNotification ->
-                    statusBarNotification.id == NOTIFICATION_ID
+                    statusBarNotification.id == notificationIdFor(ticketId)
                 }
                 ?.notification
                 ?.flags
@@ -488,9 +488,21 @@ class TrackingNotificationFactory(private val context: Context) {
     companion object {
         const val CHANNEL_TRACKING = "trip_tracking"
         const val CHANNEL_ALERTS = "trip_alerts_v2"
+        /** Legacy IDs retained for source compatibility. */
         const val NOTIFICATION_ID = 5140
         const val ALERT_NOTIFICATION_ID = 5141
         const val EXTRA_TICKET_ID = "ticket_id"
+        private const val TRACKING_NOTIFICATION_NAMESPACE = 0x10000000
+        private const val ALERT_NOTIFICATION_NAMESPACE = 0x20000000
+        private const val NOTIFICATION_ID_HASH_MASK = 0x0fffffff
+
+        fun notificationIdFor(ticketId: String): Int =
+            TRACKING_NOTIFICATION_NAMESPACE or (ticketId.hashCode() and NOTIFICATION_ID_HASH_MASK)
+
+        fun alertNotificationIdFor(ticketId: String): Int =
+            ALERT_NOTIFICATION_NAMESPACE or
+                ((ticketId.hashCode() xor 0x41E47) and NOTIFICATION_ID_HASH_MASK)
+
         private val FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
     }
 }

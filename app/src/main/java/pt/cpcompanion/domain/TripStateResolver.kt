@@ -137,21 +137,13 @@ class TripStateResolver {
                     ?: trip.overallDelayMinutes
                     ?: retainedDelayMinutes
         }
-        val originInstant = originEventExpected?.toInstant()
-        val destinationInstant = destinationExpected?.toInstant()
-        val approachingOrigin = originInstant?.let { now.isBefore(it) } == true
-        val progressEnd = if (approachingOrigin) originInstant else destinationInstant
-        val progressStart = when {
-            progressEnd == null -> null
-            approachingOrigin -> progressEnd.minus(Duration.ofHours(1))
-            originInstant != null -> originInstant
-            else -> progressEnd.minus(Duration.ofHours(1))
-        }
-        val markerStops = if (approachingOrigin) {
-            resolved.take(originIndex)
-        } else {
-            resolved.drop(originIndex + 1).take((destinationIndex - originIndex - 1).coerceAtLeast(0))
-        }
+        // The progress line represents the passenger's complete route, not a rolling one-hour
+        // time window. This keeps every calling point visible before and during the journey.
+        val originInstant = (originBoardingExpected ?: originBoardingScheduled)?.toInstant()
+        val destinationInstant = (destinationExpected ?: destinationScheduled)?.toInstant()
+        val progressStart = originInstant
+        val progressEnd = destinationInstant
+        val markerStops = resolved.subList(originIndex + 1, destinationIndex)
 
         val disruptionMessage = when {
             serviceCancelled -> trip.messages.firstOrNull() ?: "The train service is cancelled"
@@ -247,15 +239,23 @@ class TripStateResolver {
     }
 
     private fun markerPositions(stops: List<ResolvedStop>, start: Instant?, end: Instant?): List<Int> {
-        if (start == null || end == null || !end.isAfter(start)) return emptyList()
+        if (start == null || end == null || !end.isAfter(start) || stops.isEmpty()) return emptyList()
         val duration = Duration.between(start, end).toMillis()
-        return stops.mapNotNull { stop ->
-            (stop.expectedArrival ?: stop.expectedDeparture ?: stop.scheduledArrival ?: stop.scheduledDeparture)
-                ?.toInstant()
-        }.filter { it.isAfter(start) && it.isBefore(end) }
-            .map { (Duration.between(start, it).toMillis() * 1000L / duration).toInt() }
-            .distinct()
-            .sorted()
+        var previous = 0
+        return stops.mapIndexed { index, stop ->
+            val event = (stop.expectedArrival ?: stop.expectedDeparture
+                ?: stop.scheduledArrival ?: stop.scheduledDeparture)?.toInstant()
+            val timeBased = event
+                ?.takeIf { it.isAfter(start) && it.isBefore(end) }
+                ?.let { (Duration.between(start, it).toMillis() * 1000L / duration).toInt() }
+            val proportional = ((index + 1L) * 1000L / (stops.size + 1L)).toInt()
+            val remaining = stops.size - index - 1
+            val position = (timeBased ?: proportional)
+                .coerceAtLeast(previous + 1)
+                .coerceAtMost(999 - remaining)
+            previous = position
+            position
+        }
     }
 
     private fun resolveStops(

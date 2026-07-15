@@ -17,6 +17,7 @@ import java.net.UnknownHostException
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,17 +46,14 @@ import pt.cpcompanion.notifications.TrackingNotificationFactory
 
 class TrainTrackingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var trackingJob: Job? = null
-    private var promotionRetryJob: Job? = null
+    private val trackingJobs = ConcurrentHashMap<String, Job>()
+    private val promotionRetryJobs = ConcurrentHashMap<String, Job>()
+    private val lastNotificationSignatures = ConcurrentHashMap<String, String>()
+    private val promotionRetryKeys = ConcurrentHashMap<String, String>()
 
-    private var currentTicketId: String? = null
-    private var lastNotificationSignature: String? = null
-
-    /*
-    * Prevents every tracking poll from scheduling another promotion retry.
-    * One retry is performed for each important journey phase.
-    */
-    private var promotionRetryKey: String? = null
+    /** Ticket whose notification currently owns the foreground-service slot. */
+    @Volatile
+    private var foregroundTicketId: String? = null
 
     private val container by lazy { (application as TrainTrackerApplication).container }
 
@@ -67,78 +65,82 @@ class TrainTrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             val requested = intent.getStringExtra(EXTRA_TICKET_ID)
-            val active = currentTicketId ?: container.stores.activeTicketId.value
-            if (requested == null || requested == active) {
-                stopTracking(userInitiated = true)
+            if (requested != null) {
+                stopTracking(requested, userInitiated = true)
             } else {
-                // A detached terminal notification can outlive the original service instance.
-                stopSelfResult(startId)
+                container.stores.activeTicketIds.value.toList().forEach { ticketId ->
+                    stopTracking(ticketId, userInitiated = true)
+                }
             }
             return START_NOT_STICKY
         }
-        val requestedTicketId = intent?.getStringExtra(EXTRA_TICKET_ID) ?: container.stores.activeTicketId.value
-        if (requestedTicketId.isNullOrBlank()) {
-            stopSelf()
+
+        val explicitTicketId = intent?.getStringExtra(EXTRA_TICKET_ID)?.takeIf(String::isNotBlank)
+        val requestedTicketIds = explicitTicketId?.let(::listOf)
+            ?: container.stores.activeTicketIds.value.toList()
+        if (requestedTicketIds.isEmpty()) {
+            stopSelfResult(startId)
             return START_NOT_STICKY
         }
 
-        val active = container.stores.activeTicketId.value
-        val ticketId = if (active != null && active != requestedTicketId) {
-            container.stores.updateAutomation(
-                requestedTicketId,
-                TicketAutomationState.CONFLICT_WITH_OTHER_TRIP,
-                message = "Queued behind another active passenger journey",
-            )
-            // Keep/recover the existing session; never stop it because a queued ticket also fired.
-            active
-        } else {
-            requestedTicketId
+        var startedAny = false
+        requestedTicketIds.forEach { ticketId ->
+            if (startRequestedTicket(ticketId)) startedAny = true
         }
+        if (!startedAny && trackingJobs.isEmpty() && foregroundTicketId == null) {
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
+        return START_STICKY
+    }
 
-        if (!container.stores.claimActiveTicket(ticketId)) return START_STICKY
+    /** Start or recover one independently tracked passenger journey. */
+    private fun startRequestedTicket(ticketId: String): Boolean {
+        if (!container.stores.claimActiveTicket(ticketId)) return false
         container.stores.updateAutomation(
             ticketId,
             TicketAutomationState.TRACKING,
             message = "Automatic tracking is running",
             attemptedAtEpochMillis = System.currentTimeMillis(),
         )
-        val placeholder = container.stores.tracking.value?.takeIf { it.ticketId == ticketId } ?: placeholder(ticketId)
-        try {
-            startInForeground(placeholder)
-        } catch (error: SecurityException) {
+        val placeholder = container.stores.tracking(ticketId) ?: placeholder(ticketId)
+        val notificationPosted = try {
+            postInitialNotification(placeholder)
+        } catch (_: SecurityException) {
+            false
+        }
+        if (!notificationPosted) {
             container.stores.updateAutomation(
                 ticketId,
                 TicketAutomationState.BLOCKED_NOTIFICATION_PERMISSION,
                 message = "Android blocked the required foreground notification",
             )
-            container.stores.clearTracking()
-            currentTicketId = null
-            stopSelf(startId)
-            return START_NOT_STICKY
+            container.stores.clearTracking(ticketId)
+            TrackingSessionRegistry.markStopped(ticketId)
+            return false
         }
         TrackingSessionRegistry.markStarted(ticketId)
-        if (currentTicketId != ticketId || trackingJob?.isActive != true) {
-            currentTicketId = ticketId
+        if (trackingJobs[ticketId]?.isActive != true) {
             startLoop(ticketId)
         } else {
             TrackingSessionRegistry.heartbeat(ticketId)
         }
-        return START_STICKY
+        return true
     }
 
     override fun onDestroy() {
-        TrackingSessionRegistry.markStopped(currentTicketId)
-
-        trackingJob?.cancel()
-        promotionRetryJob?.cancel()
-
+        TrackingSessionRegistry.markStopped()
+        trackingJobs.values.forEach(Job::cancel)
+        promotionRetryJobs.values.forEach(Job::cancel)
+        trackingJobs.clear()
+        promotionRetryJobs.clear()
         scope.cancel()
         super.onDestroy()
     }
 
     override fun onTimeout(startId: Int, fgsType: Int) {
-        val ticketId = currentTicketId
-        if (ticketId != null) {
+        val activeIds = container.stores.activeTicketIds.value.toList()
+        activeIds.forEach { ticketId ->
             TicketActivationScheduler.cancel(this, ticketId)
             container.stores.updateTicket(ticketId) { ticket ->
                 ticket.copy(
@@ -147,7 +149,7 @@ class TrainTrackingService : Service() {
                     automationMessage = "Android ended the foreground service after its time budget; re-enable this ticket to retry",
                 )
             }
-            val current = container.stores.tracking.value ?: placeholder(ticketId)
+            val current = container.stores.tracking(ticketId) ?: placeholder(ticketId)
             updateNotification(
                 current.copy(
                     phase = PassengerPhase.STOPPED,
@@ -159,30 +161,29 @@ class TrainTrackingService : Service() {
                 force = true,
             )
         }
-        stopTracking(userInitiated = false, removeNotification = false)
+        activeIds.forEach { stopTracking(it, userInitiated = false, removeNotification = false) }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startLoop(ticketId: String) {
-        trackingJob?.cancel()
-        trackingJob = scope.launch {
+        trackingJobs.remove(ticketId)?.cancel()
+        trackingJobs[ticketId] = scope.launch {
             container.stores.awaitReady()
             var failures = 0
             var firstFailureAt: Long? = null
             while (isActive) {
                 var ticket = container.stores.ticket(ticketId) ?: run {
-                    stopTracking(userInitiated = false)
+                    stopTracking(ticketId, userInitiated = false)
                     return@launch
                 }
                 if (!ticket.automaticTrackingEnabled) {
-                    stopTracking(userInitiated = false)
+                    stopTracking(ticketId, userInitiated = false)
                     return@launch
                 }
                 try {
                     ticket = resolveStationsIfNeeded(ticket)
-                    val previous = container.stores.tracking.value
-                        ?.takeIf { it.ticketId == ticketId }
+                    val previous = container.stores.tracking(ticketId)
 
                     val previousPhase = previous?.phase
 
@@ -223,7 +224,7 @@ class TrainTrackingService : Service() {
                     container.stores.saveTracking(snapshot)
                     TrackingSessionRegistry.heartbeat(ticketId)
                     if (!updateNotification(snapshot)) {
-                        blockForNotificationPermission(ticketId)
+                        blockForNotificationPermission()
                         return@launch
                     }
                     if (!snapshot.dataStale) {
@@ -233,7 +234,7 @@ class TrainTrackingService : Service() {
                             try {
                                 container.notifications.postImportantAlert(snapshot)
                             } catch (_: SecurityException) {
-                                blockForNotificationPermission(ticketId)
+                                blockForNotificationPermission()
                                 return@launch
                             }
                         }
@@ -253,7 +254,7 @@ class TrainTrackingService : Service() {
                     failures += 1
                     val failureStartedAt = firstFailureAt ?: System.currentTimeMillis().also { firstFailureAt = it }
                     val classified = classify(error)
-                    val previous = container.stores.tracking.value?.takeIf { it.ticketId == ticketId } ?: placeholder(ticketId)
+                    val previous = container.stores.tracking(ticketId) ?: placeholder(ticketId)
                     val unavailable = container.resolver.unavailable(
                         previous = previous,
                         failures = failures,
@@ -264,7 +265,7 @@ class TrainTrackingService : Service() {
                     container.stores.saveTracking(unavailable)
                     TrackingSessionRegistry.heartbeat(ticketId)
                     if (!updateNotification(unavailable)) {
-                        blockForNotificationPermission(ticketId)
+                        blockForNotificationPermission()
                         return@launch
                     }
 
@@ -294,6 +295,19 @@ class TrainTrackingService : Service() {
         return container.stores.upsertTicket(resolved)
     }
 
+    @Synchronized
+    private fun postInitialNotification(snapshot: TrackingSnapshot): Boolean {
+        return if (foregroundTicketId == null) {
+            startInForeground(snapshot)
+            true
+        } else {
+            // A Service has one foreground-service notification slot. Keep the
+            // oldest journey in that slot and publish every additional journey
+            // as its own ongoing notification with a stable per-ticket ID.
+            updateNotification(snapshot, force = true)
+        }
+    }
+
     private fun startInForeground(
         snapshot: TrackingSnapshot,
     ) {
@@ -306,18 +320,17 @@ class TrainTrackingService : Service() {
 
         ServiceCompat.startForeground(
             this,
-            TrackingNotificationFactory.NOTIFICATION_ID,
+            TrackingNotificationFactory.notificationIdFor(snapshot.ticketId),
             container.notifications.build(snapshot),
             type,
         )
-
-        lastNotificationSignature =
-            notificationSignature(snapshot)
+        foregroundTicketId = snapshot.ticketId
+        lastNotificationSignatures[snapshot.ticketId] = notificationSignature(snapshot)
 
         schedulePromotionRetry(snapshot)
     }
 
-    
+
     private fun updateNotification(
         snapshot: TrackingSnapshot,
         force: Boolean = false,
@@ -326,7 +339,7 @@ class TrainTrackingService : Service() {
 
         if (
             !force &&
-            signature == lastNotificationSignature
+            signature == lastNotificationSignatures[snapshot.ticketId]
         ) {
             return true
         }
@@ -348,11 +361,11 @@ class TrainTrackingService : Service() {
 
         return try {
             NotificationManagerCompat.from(this).notify(
-                TrackingNotificationFactory.NOTIFICATION_ID,
+                TrackingNotificationFactory.notificationIdFor(snapshot.ticketId),
                 container.notifications.build(snapshot),
             )
 
-            lastNotificationSignature = signature
+            lastNotificationSignatures[snapshot.ticketId] = signature
             schedulePromotionRetry(snapshot)
 
             true
@@ -376,9 +389,8 @@ class TrainTrackingService : Service() {
             !container.notifications
                 .canPostPromotion()
         ) {
-            promotionRetryJob?.cancel()
-            promotionRetryJob = null
-            promotionRetryKey = null
+            promotionRetryJobs.remove(snapshot.ticketId)?.cancel()
+            promotionRetryKeys.remove(snapshot.ticketId)
             return
         }
 
@@ -389,14 +401,14 @@ class TrainTrackingService : Service() {
         val retryKey =
             "${snapshot.ticketId}|${snapshot.phase}"
 
-        if (promotionRetryKey == retryKey) {
+        if (promotionRetryKeys[snapshot.ticketId] == retryKey) {
             return
         }
 
-        promotionRetryKey = retryKey
+        promotionRetryKeys[snapshot.ticketId] = retryKey
 
-        promotionRetryJob?.cancel()
-        promotionRetryJob = scope.launch {
+        promotionRetryJobs.remove(snapshot.ticketId)?.cancel()
+        promotionRetryJobs[snapshot.ticketId] = scope.launch {
             delay(PROMOTION_RETRY_DELAY_MS)
 
             if (Build.VERSION.SDK_INT < 36) {
@@ -404,11 +416,7 @@ class TrainTrackingService : Service() {
             }
 
             val latestSnapshot =
-                container.stores.tracking.value
-                    ?.takeIf {
-                        it.ticketId == snapshot.ticketId
-                    }
-                    ?: snapshot
+                container.stores.tracking(snapshot.ticketId) ?: snapshot
 
             if (
                 !container.notifications
@@ -416,7 +424,7 @@ class TrainTrackingService : Service() {
                 !container.notifications
                     .canPostPromotion() ||
                 container.notifications
-                    .isTrackingNotificationPromoted()
+                    .isTrackingNotificationPromoted(snapshot.ticketId)
             ) {
                 return@launch
             }
@@ -432,21 +440,20 @@ class TrainTrackingService : Service() {
         }
     }
 
-    private fun blockForNotificationPermission(ticketId: String) {
-        container.stores.updateAutomation(
-            ticketId,
-            TicketAutomationState.BLOCKED_NOTIFICATION_PERMISSION,
-            message = "Notification permission or the tracking channel was disabled while tracking",
-        )
-        TrackingSessionRegistry.markStopped(ticketId)
-        container.stores.clearTracking()
-        currentTicketId = null
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        stopSelf()
+    private fun blockForNotificationPermission() {
+        container.stores.activeTicketIds.value.forEach { activeId ->
+            container.stores.updateAutomation(
+                activeId,
+                TicketAutomationState.BLOCKED_NOTIFICATION_PERMISSION,
+                message = "Notification permission or the tracking channel was disabled while tracking",
+            )
+        }
+        container.stores.activeTicketIds.value.toList().forEach { activeId ->
+            stopTracking(activeId, userInitiated = false)
+        }
         TicketAutomationReconciler.enqueue(this)
     }
 
-    
     private fun finishSession(finalSnapshot: TrackingSnapshot) {
         updateNotification(finalSnapshot, force = true)
         val ticketId = finalSnapshot.ticketId
@@ -467,14 +474,9 @@ class TrainTrackingService : Service() {
                 completedAtEpochMillis = System.currentTimeMillis(),
             )
         }
-        TrackingSessionRegistry.markStopped(ticketId)
-        container.stores.clearTracking()
-        currentTicketId = null
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
-        stopSelf()
+        endSession(ticketId, removeNotification = false)
     }
 
-    
     private fun failSession(ticketId: String, snapshot: TrackingSnapshot, message: String) {
         TicketActivationScheduler.cancel(this, ticketId)
         container.stores.updateTicket(ticketId) { ticket ->
@@ -493,22 +495,18 @@ class TrainTrackingService : Service() {
             ),
             force = true,
         )
-        TrackingSessionRegistry.markStopped(ticketId)
-        container.stores.clearTracking()
-        currentTicketId = null
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
-        stopSelf()
+        endSession(ticketId, removeNotification = false)
         TicketAutomationReconciler.enqueue(this)
     }
 
-    
-    private fun stopTracking(userInitiated: Boolean, removeNotification: Boolean = true) {
-        trackingJob?.cancel()
-        val current = container.stores.tracking.value
-        val ticketId = currentTicketId ?: current?.ticketId ?: container.stores.activeTicketId.value
-        if (userInitiated && ticketId != null) {
+    private fun stopTracking(
+        ticketId: String,
+        userInitiated: Boolean,
+        removeNotification: Boolean = true,
+    ) {
+        val current = container.stores.tracking(ticketId)
+        if (userInitiated) {
             TicketActivationScheduler.cancel(this, ticketId)
-            // This is the deliberate per-ticket automation opt-out allowed by the product contract.
             container.stores.updateTicket(ticketId) { ticket ->
                 ticket.copy(
                     automaticTrackingEnabled = false,
@@ -521,26 +519,72 @@ class TrainTrackingService : Service() {
                     completedAtEpochMillis = null,
                 )
             }
-        }
-        if (userInitiated && current != null) {
-            val stopped = current.copy(
-                phase = PassengerPhase.STOPPED,
-                lastAttemptEpochMillis = System.currentTimeMillis(),
-                updatedAtEpochMillis = current.lastSuccessfulFetchEpochMillis,
-            )
-            updateNotification(stopped, force = true)
+            if (current != null) {
+                updateNotification(
+                    current.copy(
+                        phase = PassengerPhase.STOPPED,
+                        lastAttemptEpochMillis = System.currentTimeMillis(),
+                        updatedAtEpochMillis = current.lastSuccessfulFetchEpochMillis,
+                    ),
+                    force = true,
+                )
+            } else {
+                // A ticket can be deleted immediately after its stop command is sent.
+                // In that race there is no snapshot left to turn into a terminal notification.
+                NotificationManagerCompat.from(this).cancel(
+                    TrackingNotificationFactory.notificationIdFor(ticketId),
+                )
+            }
         } else if (removeNotification) {
-            NotificationManagerCompat.from(this).cancel(TrackingNotificationFactory.NOTIFICATION_ID)
+            NotificationManagerCompat.from(this).cancel(
+                TrackingNotificationFactory.notificationIdFor(ticketId),
+            )
         }
-        TrackingSessionRegistry.markStopped(ticketId)
-        container.stores.clearTracking()
-        currentTicketId = null
-        ServiceCompat.stopForeground(
-            this,
-            if (removeNotification) ServiceCompat.STOP_FOREGROUND_REMOVE else ServiceCompat.STOP_FOREGROUND_DETACH,
-        )
-        stopSelf()
+        endSession(ticketId, removeNotification = removeNotification && !userInitiated)
         TicketAutomationReconciler.enqueue(this)
+    }
+
+    @Synchronized
+    private fun endSession(ticketId: String, removeNotification: Boolean) {
+        trackingJobs.remove(ticketId)?.cancel()
+        promotionRetryJobs.remove(ticketId)?.cancel()
+        promotionRetryKeys.remove(ticketId)
+        lastNotificationSignatures.remove(ticketId)
+        TrackingSessionRegistry.markStopped(ticketId)
+        container.stores.clearTracking(ticketId)
+
+        val remaining = trackingJobs.keys.firstOrNull()
+        if (foregroundTicketId == ticketId) {
+            if (remaining != null) {
+                val snapshot = container.stores.tracking(remaining) ?: placeholder(remaining)
+                val type = if (Build.VERSION.SDK_INT >= 34) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                } else {
+                    0
+                }
+                ServiceCompat.startForeground(
+                    this,
+                    TrackingNotificationFactory.notificationIdFor(remaining),
+                    container.notifications.build(snapshot),
+                    type,
+                )
+                foregroundTicketId = remaining
+            } else {
+                ServiceCompat.stopForeground(
+                    this,
+                    if (removeNotification) ServiceCompat.STOP_FOREGROUND_REMOVE else ServiceCompat.STOP_FOREGROUND_DETACH,
+                )
+                foregroundTicketId = null
+                stopSelf()
+            }
+        } else if (trackingJobs.isEmpty()) {
+            ServiceCompat.stopForeground(
+                this,
+                if (removeNotification) ServiceCompat.STOP_FOREGROUND_REMOVE else ServiceCompat.STOP_FOREGROUND_DETACH,
+            )
+            foregroundTicketId = null
+            stopSelf()
+        }
     }
 
     private fun placeholder(ticketId: String): TrackingSnapshot {
@@ -674,6 +718,7 @@ class TrainTrackingService : Service() {
         snapshot.seat,
         snapshot.nextStopName,
         snapshot.progress / 10,
+        snapshot.progressMarkers.joinToString(","),
         StatusChipFormatter.format(snapshot),
         snapshot.dataStale,
         snapshot.retryAtEpochMillis,

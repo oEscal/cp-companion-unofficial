@@ -25,7 +25,7 @@ object TicketAutomationReconciler {
         val stores = app.container.stores
         stores.awaitReady()
         val now = System.currentTimeMillis()
-        val activeId = stores.activeTicketId.value
+        val activeIds = stores.activeTicketIds.value
         val tickets = stores.tickets.value
             .asSequence()
             .filter { onlyTicketId == null || it.id == onlyTicketId }
@@ -37,7 +37,7 @@ object TicketAutomationReconciler {
                 TicketActivationScheduler.cancel(context, ticket.id)
                 return@forEach
             }
-            if (ticket.id == activeId) {
+            if (ticket.id in activeIds) {
                 // An already-running delayed journey remains eligible even after its scheduled arrival.
                 if (!TrackingSessionRegistry.isRunning(ticket.id)) {
                     TicketActivationLauncher.activate(context, ticket.id, "active-session recovery")
@@ -85,15 +85,7 @@ object TicketAutomationReconciler {
             }
             val activationAt = ticket.scheduledDepartureEpochMillis - TicketActivationScheduler.LEAD_TIME_MS
             if (activationAt <= now && (arrival == null || arrival > now)) {
-                if (activeId == null) {
-                    TicketActivationLauncher.activate(context, ticket.id, "reconciliation")
-                } else {
-                    stores.updateAutomation(
-                        ticket.id,
-                        TicketAutomationState.CONFLICT_WITH_OTHER_TRIP,
-                        message = "Queued behind another active passenger journey",
-                    )
-                }
+                TicketActivationLauncher.activate(context, ticket.id, "reconciliation")
             } else {
                 TicketActivationScheduler.schedule(context, ticket)
             }

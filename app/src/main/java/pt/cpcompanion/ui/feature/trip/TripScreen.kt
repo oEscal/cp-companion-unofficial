@@ -378,26 +378,73 @@ private fun CreateTrackingTicketDialog(
     onDismiss: () -> Unit,
     onCreate: (String, String, String, String) -> Unit,
 ) {
-    var origin by rememberSaveable { mutableStateOf(trip.stops.firstOrNull()?.station?.code.orEmpty()) }
-    var destination by rememberSaveable { mutableStateOf(trip.stops.lastOrNull()?.station?.code.orEmpty()) }
+    var selectedOriginCode by rememberSaveable {
+        mutableStateOf<String?>(trip.stops.firstOrNull()?.station?.code)
+    }
+    var selectedDestinationCode by rememberSaveable {
+        mutableStateOf<String?>(trip.stops.lastOrNull()?.station?.code)
+    }
     var carriage by rememberSaveable { mutableStateOf("") }
     var seat by rememberSaveable { mutableStateOf("") }
+
+    val originOptions = trip.stops.dropLast(1).map { stop ->
+        SearchableDropdownOption(
+            key = stop.station.code,
+            label = stop.station.name,
+            searchText = "${stop.station.name} ${stop.station.code}",
+        )
+    }
+    val originIndex = trip.stops.indexOfFirst { it.station.code == selectedOriginCode }
+    val destinationOptions = if (originIndex >= 0) {
+        trip.stops.drop(originIndex + 1).map { stop ->
+            SearchableDropdownOption(
+                key = stop.station.code,
+                label = stop.station.name,
+                searchText = "${stop.station.name} ${stop.station.code}",
+            )
+        }
+    } else {
+        emptyList()
+    }
+
+    LaunchedEffect(selectedOriginCode, destinationOptions) {
+        if (selectedDestinationCode !in destinationOptions.map { it.key }) {
+            selectedDestinationCode = destinationOptions.lastOrNull()?.key
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.save_passenger_journey)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.save_passenger_journey_body))
-                OutlinedTextField(origin, { origin = it }, label = { Text(stringResource(R.string.origin_station_code)) }, singleLine = true)
-                OutlinedTextField(destination, { destination = it }, label = { Text(stringResource(R.string.destination_station_code)) }, singleLine = true)
+                SearchableDropdownField(
+                    label = stringResource(R.string.origin_station),
+                    selectedKey = selectedOriginCode,
+                    options = originOptions,
+                    onSelected = { option -> selectedOriginCode = option?.key },
+                )
+                SearchableDropdownField(
+                    label = stringResource(R.string.destination_station),
+                    selectedKey = selectedDestinationCode,
+                    options = destinationOptions,
+                    onSelected = { option -> selectedDestinationCode = option?.key },
+                    enabled = selectedOriginCode != null && destinationOptions.isNotEmpty(),
+                    stateKey = selectedOriginCode,
+                )
                 OutlinedTextField(carriage, { carriage = it }, label = { Text(stringResource(R.string.carriage_optional)) }, singleLine = true)
                 OutlinedTextField(seat, { seat = it }, label = { Text(stringResource(R.string.seat_optional)) }, singleLine = true)
             }
         },
         confirmButton = {
             Button(
-                onClick = { onCreate(origin.trim(), destination.trim(), carriage, seat) },
-                enabled = origin.isNotBlank() && destination.isNotBlank() && origin != destination,
+                onClick = {
+                    val origin = selectedOriginCode ?: return@Button
+                    val destination = selectedDestinationCode ?: return@Button
+                    onCreate(origin, destination, carriage, seat)
+                },
+                enabled = selectedOriginCode != null && selectedDestinationCode != null,
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },

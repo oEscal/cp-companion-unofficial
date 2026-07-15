@@ -213,4 +213,10 @@
     <string name="live_update_promotion">Live Update promotion</string>
     <string name="live_update_promotion_body">Allow CP Companion to display the train journey as a promoted Live Update, including the status-bar chip.</string>
     <string name="manage_live_updates">Manage Live Updates</string>
+    <string name="origin_station">Origin station</string>
+    <string name="destination_station">Destination station</string>
+    <string name="type_two_characters_to_search_trains">Type at least 2 characters to search for a train.</string>
+    <string name="no_matching_options">No matching options</string>
+    <string name="loading_train_route">Loading this train route…</string>
+    <string name="train_route_unavailable">This train route could not be loaded for the selected date.</string>
 </resources>
