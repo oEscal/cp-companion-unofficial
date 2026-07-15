@@ -213,4 +213,10 @@
     <string name="live_update_promotion">Promoção da atualização em direto</string>
     <string name="live_update_promotion_body">Permita que o CP Companion apresente a viagem de comboio como uma atualização em direto promovida, incluindo o indicador na barra de estado.</string>
     <string name="manage_live_updates">Gerir atualizações em direto</string>
+    <string name="origin_station">Estação de origem</string>
+    <string name="destination_station">Estação de destino</string>
+    <string name="type_two_characters_to_search_trains">Escreva pelo menos 2 caracteres para procurar um comboio.</string>
+    <string name="no_matching_options">Sem opções correspondentes</string>
+    <string name="loading_train_route">A carregar o percurso deste comboio…</string>
+    <string name="train_route_unavailable">Não foi possível carregar o percurso deste comboio para a data selecionada.</string>
 </resources>

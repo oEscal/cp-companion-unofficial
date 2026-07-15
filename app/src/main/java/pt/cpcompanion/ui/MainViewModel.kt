@@ -365,8 +365,10 @@ class MainViewModel(
 
     fun refreshCurrentTripSilently() {
         val screen = _state.value.screen as? AppScreen.TripScreen ?: return
-        val tracking = container.stores.tracking.value
-        if (tracking?.trainNumber == screen.trainNumber && tracking.serviceDate == screen.date) return
+        val alreadyTracked = container.stores.trackingSnapshots.value.values.any { tracking ->
+            tracking.trainNumber == screen.trainNumber && tracking.serviceDate == screen.date
+        }
+        if (alreadyTracked) return
         loadTrip(screen.trainNumber, screen.date, showLoading = false)
     }
 
@@ -468,8 +470,7 @@ class MainViewModel(
     }
 
     fun deleteTicket(ticketId: String) {
-        val isActive = container.stores.activeTicketId.value == ticketId ||
-            container.stores.tracking.value?.ticketId == ticketId
+        val isActive = ticketId in container.stores.activeTicketIds.value
         if (isActive) TrainTrackingService.stop(getApplication(), ticketId)
         TicketReminderScheduler.cancel(getApplication(), ticketId)
         container.stores.deleteTicket(ticketId)
@@ -498,7 +499,7 @@ class MainViewModel(
             TicketActivationScheduler.schedule(getApplication(), ticket, force = true)
         } else {
             TicketActivationScheduler.cancel(getApplication(), ticketId)
-            if (container.stores.activeTicketId.value == ticketId || container.stores.tracking.value?.ticketId == ticketId) {
+            if (ticketId in container.stores.activeTicketIds.value) {
                 TrainTrackingService.stop(getApplication(), ticketId)
             }
         }
@@ -577,8 +578,14 @@ class MainViewModel(
         }
     }
 
-    fun stopTracking() {
-        TrainTrackingService.stop(getApplication(), container.stores.activeTicketId.value)
+    suspend fun loadTripForTicketForm(trainNumber: String, serviceDate: String): TrainTrip? =
+        withContext(Dispatchers.IO) {
+            val date = runCatching { LocalDate.parse(serviceDate) }.getOrNull() ?: return@withContext null
+            runCatching { container.repository.trip(trainNumber, date) }.getOrNull()
+        }
+
+    fun stopTracking(ticketId: String? = container.stores.activeTicketId.value) {
+        TrainTrackingService.stop(getApplication(), ticketId)
         _state.value = _state.value.copy(message = "Tracking stopped and disabled for this ticket")
     }
 

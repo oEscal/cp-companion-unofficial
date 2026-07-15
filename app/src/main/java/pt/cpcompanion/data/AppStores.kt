@@ -70,16 +70,46 @@ class AppStores(context: Context) {
     private val _favoriteStationCodes = MutableStateFlow<Set<String>>(emptySet())
     val favoriteStationCodes: StateFlow<Set<String>> = _favoriteStationCodes.asStateFlow()
 
-    private val _tracking = MutableStateFlow(
-        secure.get(KEY_TRACKING)?.let {
-            runCatching { json.decodeFromString<TrackingSnapshot>(it) }.getOrNull()
-        },
-    )
-    val tracking: StateFlow<TrackingSnapshot?> = _tracking.asStateFlow()
-    private var lastTrackingPersistEpochMillis = _tracking.value?.lastAttemptEpochMillis ?: 0L
+    private val initialTrackingSnapshots: Map<String, TrackingSnapshot> =
+        secure.get(KEY_TRACKING_SESSIONS)?.let { encoded ->
+            runCatching {
+                json.decodeFromString(ListSerializer(TrackingSnapshot.serializer()), encoded)
+                    .associateBy(TrackingSnapshot::ticketId)
+            }.getOrNull()
+        } ?: secure.get(KEY_TRACKING)?.let { encoded ->
+            runCatching { json.decodeFromString<TrackingSnapshot>(encoded) }
+                .getOrNull()
+                ?.let { mapOf(it.ticketId to it) }
+        }.orEmpty()
 
-    private val _activeTicketId = MutableStateFlow(secure.get(KEY_ACTIVE_TICKET))
+    private val initialActiveTicketIds: LinkedHashSet<String> = linkedSetOf<String>().apply {
+        secure.get(KEY_ACTIVE_TICKETS)
+            ?.lineSequence()
+            ?.map(String::trim)
+            ?.filter(String::isNotBlank)
+            ?.forEach(::add)
+        secure.get(KEY_ACTIVE_TICKET)?.takeIf(String::isNotBlank)?.let(::add)
+        addAll(initialTrackingSnapshots.keys)
+    }
+
+    private val _trackingSnapshots = MutableStateFlow(initialTrackingSnapshots)
+    val trackingSnapshots: StateFlow<Map<String, TrackingSnapshot>> = _trackingSnapshots.asStateFlow()
+
+    private val _activeTicketIds = MutableStateFlow<Set<String>>(initialActiveTicketIds)
+    val activeTicketIds: StateFlow<Set<String>> = _activeTicketIds.asStateFlow()
+
+    private val _activeTicketId = MutableStateFlow(initialActiveTicketIds.firstOrNull())
     val activeTicketId: StateFlow<String?> = _activeTicketId.asStateFlow()
+
+    private val _tracking = MutableStateFlow(
+        _activeTicketId.value?.let(initialTrackingSnapshots::get)
+            ?: initialTrackingSnapshots.values.firstOrNull(),
+    )
+    /** Primary/oldest active session retained for existing single-session UI surfaces. */
+    val tracking: StateFlow<TrackingSnapshot?> = _tracking.asStateFlow()
+    private val lastTrackingPersistEpochMillis = initialTrackingSnapshots
+        .mapValues { (_, snapshot) -> snapshot.lastAttemptEpochMillis }
+        .toMutableMap()
 
     private val processedNotificationFingerprints = LinkedHashSet<String>()
     private val ready = CompletableDeferred<Unit>()
@@ -286,44 +316,96 @@ class AppStores(context: Context) {
         if (updated.size == _tickets.value.size) return
         _tickets.value = updated
         persistenceScope.launch { ticketDao.delete(ticketId) }
-        if (_activeTicketId.value == ticketId) clearTracking()
+        if (ticketId in _activeTicketIds.value) clearTracking(ticketId)
     }
 
+    /** Register a concurrent tracking session. The oldest session remains the primary UI session. */
     @Synchronized
     fun claimActiveTicket(ticketId: String): Boolean {
-        val active = _activeTicketId.value
-        if (active != null && active != ticketId) return false
-        if (active == ticketId) return true
-        secure.putDurable(KEY_ACTIVE_TICKET, ticketId)
-        _activeTicketId.value = ticketId
+        if (ticketId in _activeTicketIds.value) return true
+        val updated = LinkedHashSet(_activeTicketIds.value).apply { add(ticketId) }
+        persistActiveTicketIds(updated)
+        _activeTicketIds.value = updated
+        if (_activeTicketId.value == null) {
+            _activeTicketId.value = ticketId
+            secure.putDurable(KEY_ACTIVE_TICKET, ticketId)
+        }
         return true
     }
 
     @Synchronized
     fun saveTracking(snapshot: TrackingSnapshot) {
-        val previous = _tracking.value
+        val previous = _trackingSnapshots.value[snapshot.ticketId]
         if (previous == snapshot) return
         val now = System.currentTimeMillis()
         val meaningfulTransition = previous == null ||
-            previous.ticketId != snapshot.ticketId ||
             previous.phase != snapshot.phase ||
             previous.dataStale != snapshot.dataStale ||
             previous.failureCategory != snapshot.failureCategory ||
             previous.retryAtEpochMillis != snapshot.retryAtEpochMillis
-        if (meaningfulTransition || now - lastTrackingPersistEpochMillis >= TRACKING_CHECKPOINT_INTERVAL_MS) {
-            secure.put(KEY_TRACKING, json.encodeToString(snapshot))
-            lastTrackingPersistEpochMillis = now
+        val lastPersist = lastTrackingPersistEpochMillis[snapshot.ticketId] ?: 0L
+        val updated = _trackingSnapshots.value + (snapshot.ticketId to snapshot)
+        _trackingSnapshots.value = updated
+        if (_activeTicketId.value == snapshot.ticketId || _tracking.value == null) {
+            _tracking.value = snapshot
         }
-        _tracking.value = snapshot
+        if (meaningfulTransition || now - lastPersist >= TRACKING_CHECKPOINT_INTERVAL_MS) {
+            persistTrackingSnapshots(updated)
+            lastTrackingPersistEpochMillis[snapshot.ticketId] = now
+        }
     }
 
+    fun tracking(ticketId: String): TrackingSnapshot? = _trackingSnapshots.value[ticketId]
+
     @Synchronized
-    fun clearTracking() {
-        secure.remove(KEY_TRACKING)
-        secure.removeDurable(KEY_ACTIVE_TICKET)
-        _tracking.value = null
-        _activeTicketId.value = null
-        lastTrackingPersistEpochMillis = 0L
+    fun clearTracking(ticketId: String? = null) {
+        if (ticketId == null) {
+            secure.remove(KEY_TRACKING)
+            secure.remove(KEY_TRACKING_SESSIONS)
+            secure.removeDurable(KEY_ACTIVE_TICKET)
+            secure.removeDurable(KEY_ACTIVE_TICKETS)
+            _trackingSnapshots.value = emptyMap()
+            _activeTicketIds.value = emptySet()
+            _tracking.value = null
+            _activeTicketId.value = null
+            lastTrackingPersistEpochMillis.clear()
+            return
+        }
+
+        val snapshots = _trackingSnapshots.value - ticketId
+        val active = LinkedHashSet(_activeTicketIds.value).apply { remove(ticketId) }
+        val primary = if (_activeTicketId.value == ticketId) active.firstOrNull() else _activeTicketId.value
+
+        _trackingSnapshots.value = snapshots
+        _activeTicketIds.value = active
+        _activeTicketId.value = primary
+        _tracking.value = primary?.let(snapshots::get) ?: snapshots.values.firstOrNull()
+        lastTrackingPersistEpochMillis.remove(ticketId)
+
+        persistTrackingSnapshots(snapshots)
+        persistActiveTicketIds(active)
+        if (primary == null) secure.removeDurable(KEY_ACTIVE_TICKET)
+        else secure.putDurable(KEY_ACTIVE_TICKET, primary)
+    }
+
+    private fun persistTrackingSnapshots(snapshots: Map<String, TrackingSnapshot>) {
+        if (snapshots.isEmpty()) {
+            secure.remove(KEY_TRACKING_SESSIONS)
+            secure.remove(KEY_TRACKING)
+        } else {
+            secure.put(
+                KEY_TRACKING_SESSIONS,
+                json.encodeToString(ListSerializer(TrackingSnapshot.serializer()), snapshots.values.toList()),
+            )
+            // Keep a legacy-compatible primary checkpoint for upgrades/downgrades.
+            val primary = _activeTicketId.value?.let(snapshots::get) ?: snapshots.values.first()
+            secure.put(KEY_TRACKING, json.encodeToString(primary))
+        }
+    }
+
+    private fun persistActiveTicketIds(ticketIds: Collection<String>) {
+        if (ticketIds.isEmpty()) secure.removeDurable(KEY_ACTIVE_TICKETS)
+        else secure.putDurable(KEY_ACTIVE_TICKETS, ticketIds.joinToString("\n"))
     }
 
     fun ticket(ticketId: String): Ticket? = _tickets.value.firstOrNull { it.id == ticketId }
@@ -465,7 +547,9 @@ class AppStores(context: Context) {
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_FAVORITE_STATIONS = "favorite_station_codes"
         const val KEY_TRACKING = "tracking"
+        const val KEY_TRACKING_SESSIONS = "tracking_sessions_v2"
         const val KEY_ACTIVE_TICKET = "active_ticket"
+        const val KEY_ACTIVE_TICKETS = "active_tickets_v2"
         const val KEY_NOTIFICATION_IMPORT_FINGERPRINTS = "notification_import_fingerprints"
         const val MAX_NOTIFICATION_FINGERPRINTS = 256
         const val TRACKING_CHECKPOINT_INTERVAL_MS = 60_000L
