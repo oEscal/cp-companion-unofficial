@@ -274,16 +274,23 @@ class CpApiClient(
     private fun parseRetryAfter(value: String?): Long? {
         val text = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
         text.toLongOrNull()?.let { seconds ->
-            return System.currentTimeMillis() + seconds.coerceAtLeast(1L) * 1000L
+            return System.currentTimeMillis() +
+                seconds.coerceIn(1L, MAX_RETRY_AFTER_SECONDS) * 1000L
         }
         return runCatching {
             ZonedDateTime.parse(text, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli()
-        }.getOrNull()
+        }.getOrNull()?.coerceIn(
+            System.currentTimeMillis() + 1_000L,
+            System.currentTimeMillis() + MAX_RETRY_AFTER_SECONDS * 1000L,
+        )
     }
 
     private fun buildUrl(baseUrl: String, path: String, query: Map<String, String>): HttpUrl {
         val base = baseUrl.trimEnd('/').toHttpUrl()
-        require(isAllowedHost(base.host)) { "Unexpected CP API host" }
+        require(base.isHttps) { "Unexpected non-HTTPS CP API URL" }
+        require(isAllowedHost(base.host) && base.port == 443) { "Unexpected CP API host or port" }
+        require(base.username.isEmpty() && base.password.isEmpty()) { "Unexpected credentials in CP API URL" }
+        require(base.query == null && base.fragment == null) { "Unexpected query or fragment in CP API URL" }
         val builder = base.newBuilder()
         path.trim('/').split('/').filter(String::isNotBlank).forEach(builder::addPathSegment)
         query.toSortedMap().forEach { (key, value) -> builder.addQueryParameter(key, value) }
@@ -302,8 +309,15 @@ class CpApiClient(
         val url = runCatching { value.toHttpUrl() }
             .getOrElse { throw ApiConfigurationException("CP supplied an invalid service URL") }
         if (!url.isHttps) throw ApiConfigurationException("CP supplied a non-HTTPS service URL")
-        if (!isAllowedHost(url.host)) throw ApiConfigurationException("CP supplied an unexpected service host")
-        if (!url.encodedPath.trimEnd('/').startsWith(expectedPathPrefix)) {
+        if (!isAllowedHost(url.host) || url.port != 443) {
+            throw ApiConfigurationException("CP supplied an unexpected service host or port")
+        }
+        if (url.username.isNotEmpty() || url.password.isNotEmpty() || url.query != null || url.fragment != null) {
+            throw ApiConfigurationException("CP supplied an unsafe service URL")
+        }
+        val actualPath = url.encodedPath.trimEnd('/')
+        val expectedPath = expectedPathPrefix.trimEnd('/')
+        if (actualPath != expectedPath && !actualPath.startsWith("$expectedPath/")) {
             throw ApiConfigurationException("CP supplied an unexpected service path")
         }
     }
@@ -327,7 +341,8 @@ class CpApiClient(
     private companion object {
         const val CP_ORIGIN = "https://www.cp.pt"
         const val CONFIG_URL = "$CP_ORIGIN/fe-config.json"
-        const val USER_AGENT = "CP-Companion-Android/0.6.0"
+        const val USER_AGENT = "CP-Companion-Android/0.7.0"
+        const val MAX_RETRY_AFTER_SECONDS = 24L * 60L * 60L
         const val CONFIG_MAX_AGE_MILLIS = 24L * 60L * 60L * 1000L
         const val CATALOG_TTL_MS = 6L * 60L * 60L * 1000L
         const val TRIP_TTL_MS = 8_000L

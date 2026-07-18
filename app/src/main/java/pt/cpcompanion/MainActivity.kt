@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.UUID
 import pt.cpcompanion.notifications.TrackingNotificationFactory
 import pt.cpcompanion.ui.MainViewModel
 import pt.cpcompanion.ui.TrainTrackerApp
@@ -53,12 +54,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun consumeIntent(intent: Intent) {
-        ticketToOpen.value = intent.getStringExtra(TrackingNotificationFactory.EXTRA_TICKET_ID)
+        ticketToOpen.value = (
+            intent.getStringExtra(TrackingNotificationFactory.EXTRA_TICKET_ID)
             ?: intent.data
                 ?.takeIf { it.scheme == "cpcompanion" && it.host == "trip" }
                 ?.getQueryParameter("ticketId")
+            )?.takeIf(::isValidTicketId)
         if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
-            sharedSmsText.value = intent.getStringExtra(Intent.EXTRA_TEXT)
+            sharedSmsText.value = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)
+                ?.toString()
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() && it.length <= MAX_SHARED_TEXT_CHARS }
         }
+    }
+
+    private fun isValidTicketId(value: String): Boolean =
+        value.length <= MAX_TICKET_ID_CHARS && runCatching { UUID.fromString(value) }.isSuccess
+
+    private companion object {
+        const val MAX_TICKET_ID_CHARS = 64
+        const val MAX_SHARED_TEXT_CHARS = 64 * 1024
     }
 }

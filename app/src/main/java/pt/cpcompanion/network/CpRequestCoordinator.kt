@@ -2,6 +2,7 @@ package pt.cpcompanion.network
 
 import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 import kotlin.random.Random
 import kotlinx.coroutines.CompletableDeferred
@@ -49,8 +50,7 @@ class CpRequestCoordinator internal constructor(
     private val inFlight = mutableMapOf<String, CompletableDeferred<SharedResult>>()
     private val counters = ConcurrentHashMap<String, Long>()
 
-    @Volatile
-    private var cooldownUntilEpochMillis: Long = 0L
+    private val cooldownUntilEpochMillis = AtomicLong(0L)
 
     private var tokens = BUCKET_CAPACITY.toDouble()
     private var lastRefillNanos = System.nanoTime()
@@ -100,7 +100,7 @@ class CpRequestCoordinator internal constructor(
         if (!lookup.owner) return shared.await().toResponse()
 
         try {
-            val cooldown = cooldownUntilEpochMillis
+            val cooldown = cooldownUntilEpochMillis.get()
             if (cooldown > System.currentTimeMillis()) {
                 staleCandidate?.let { cached ->
                     val result = SharedResult(
@@ -137,13 +137,15 @@ class CpRequestCoordinator internal constructor(
                 val directed = error.retryAfterEpochMillis
                 val fallback = System.currentTimeMillis() + DEFAULT_429_COOLDOWN_MS
                 val jitteredRetry = (directed ?: fallback) + Random.nextLong(1_000L, 5_001L)
-                cooldownUntilEpochMillis = maxOf(cooldownUntilEpochMillis, jitteredRetry)
+                val effectiveCooldown = cooldownUntilEpochMillis.updateAndGet { current ->
+                    maxOf(current, jitteredRetry)
+                }
                 staleCandidate?.let { cached ->
                     val result = SharedResult(
                         value = cached.value,
                         fetchedAtEpochMillis = cached.fetchedAtEpochMillis,
                         stale = true,
-                        cooldownUntilEpochMillis = cooldownUntilEpochMillis,
+                        cooldownUntilEpochMillis = effectiveCooldown,
                     )
                     shared.complete(result)
                     return result.toResponse()
@@ -156,7 +158,7 @@ class CpRequestCoordinator internal constructor(
         }
     }
 
-    fun cooldownUntil(): Long? = cooldownUntilEpochMillis.takeIf { it > System.currentTimeMillis() }
+    fun cooldownUntil(): Long? = cooldownUntilEpochMillis.get().takeIf { it > System.currentTimeMillis() }
 
     fun requestCounters(): Map<String, Long> = counters.toSortedMap()
 

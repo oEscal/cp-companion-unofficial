@@ -19,8 +19,8 @@ android {
         applicationId = "pt.cpcompanion"
         minSdk = 30
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.6.0"
+        versionCode = 9
+        versionName = "0.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -85,8 +85,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
 
-    implementation("androidx.concurrent:concurrent-futures:1.2.0")
-    implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
+    implementation(libs.androidx.concurrent.futures)
+    implementation(libs.androidx.concurrent.futures.ktx)
 
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

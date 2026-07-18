@@ -1,32 +1,32 @@
-# CP Companion 0.6.0
+# CP Companion 0.7.0
 
-Unofficial native Android application for CP station boards, train-trip details, passenger tickets, SMS ticket import, and automatic live journey tracking.
+Unofficial native Android application for CP station boards, train-trip details, locally imported passenger tickets, and automatic live journey tracking.
 
-## Core behavior
+## Current behavior
 
-Every validated future ticket has automatic tracking enabled by default. The app schedules activation for one hour before the passenger's departure, starts an ongoing notification without requiring a Track action, adapts polling between approximately 10 and 60 seconds, and stops after a confirmed destination arrival or terminal disruption.
+Validated future tickets enable automatic tracking by default. The app schedules activation for one hour before the passenger departure, recovers scheduling after reboot, application update, clock/time-zone changes, or exact-alarm permission changes, and starts an ongoing journey notification without requiring a manual **Track now** action. Polling adapts to journey phase, shares identical requests, retains bounded stale data during CP outages or HTTP 429 cooldowns, and stops after a confirmed destination arrival or terminal disruption.
 
-The automation switch is shown only while a ticket is still in the future. Once departure has passed, the switch is removed and the ticket cannot accidentally remain enabled as historical work. **Track now** remains an optional early-start action for future tickets.
+Recent scheduled arrivals are not treated as proof that a delayed train has completed. The automation layer keeps a six-hour verification window and uses live CP data before terminalizing the journey.
 
-This repository builds one application with the application ID `pt.cpcompanion`. Direct SMS inbox import, paste/share import, and notification-listener import are included in the same app. Inbox access remains opt-in at runtime.
+The project contains one application with application ID `pt.cpcompanion`. Direct SMS inbox import, paste/share import, and notification-listener import are included in the same app. Inbox access remains opt-in at runtime.
 
-## 0.6.0 changes
+## 0.7.0 finalization
 
-- Prevents completed or cancelled journeys from being reactivated by reconciliation.
-- Removes stale notification actions from terminal journeys and safely handles actions from detached notifications.
-- Stops an active service immediately when automation is disabled or its ticket is deleted.
-- Hides automation controls for departed and past tickets while preserving the default-on behavior for future tickets.
-- Serializes manual and periodic SMS scans and atomically merges cursor/settings changes.
-- Resolves station-board service dates correctly across midnight.
-- Stores each ticket as an independently encrypted Room row instead of one encrypted JSON collection.
-- Stores preferences in DataStore and orders persistence operations to avoid stale writes winning races.
-- Restores navigation routes through Navigation Compose and saved state.
-- Splits the Compose UI into Home, Search, Station, Trip, Tickets, and Settings features.
-- Localizes the main UI, accessibility labels, channels, and journey notifications in English and Portuguese.
-- Adds Room, navigation-state, ticket-automation, midnight-date, tracking, SMS, journey-state, and request-coordination tests.
-- Adds CI and optional environment-based release signing.
+- Applies Material 3 Expressive globally through `MaterialExpressiveTheme`, expressive shapes/typography, dynamic color, and System/Light/Dark modes.
+- Updates Material 3 Expressive to `1.5.0-alpha24` and AndroidX Concurrent to `1.3.0`.
+- Fixes delayed-trip automation being completed solely from scheduled arrival time.
+- Preserves coroutine cancellation in workers, validation, imports, and UI loading paths instead of turning cancellation into retries or errors.
+- Makes catalogue persistence atomic and self-healing after interrupted or corrupt writes.
+- Hardens encrypted-value decoding and removes only unreadable entries after key invalidation or restore damage.
+- Enforces HTTPS-only CP traffic, exact gateway host/port/path validation, and rejects credentials, queries, and fragments in runtime service URLs.
+- Adds explicit backup/device-transfer exclusions and keeps Android backup disabled for ticket and tracking data.
+- Validates exported activity input, shared text size, deep-link ticket IDs, system receiver actions, and notification-import body size.
+- Makes the global HTTP 429 cooldown update atomic and bounds `Retry-After` to 24 hours.
+- Removes journey/ticket identifiers from notification diagnostic logging.
+- Completes English/Portuguese resource parity for the modified search, trip-status, automation, and error surfaces.
+- Adds source validation, archive exclusions, and an Android CI workflow.
 
-The existing AlarmManager/WorkManager T-60 recovery, CP request coalescing, bounded caches, global HTTP 429 cooldown, adaptive polling, station time-zone handling, and System/Light/Dark themes remain in place.
+See `docs/CHANGELOG_0.7.0.md`, `docs/IMPLEMENTATION_STATUS.md`, `docs/VALIDATION.md`, and `TODO.md`.
 
 ## Build
 
@@ -34,8 +34,8 @@ Requirements:
 
 - JDK 17 or newer
 - Android SDK platform 37
-- Compatible Android Build Tools
-- Network access for uncached Gradle/Maven dependencies
+- Android Build Tools 36.0.0 or a compatible newer version
+- Network access for uncached Gradle and Maven dependencies
 
 Run:
 
@@ -43,7 +43,7 @@ Run:
 ./build.sh
 ```
 
-The script runs:
+The script first validates XML, resources, translation parity, and security/build invariants. It then runs:
 
 ```text
 :app:testDebugUnitTest
@@ -53,18 +53,18 @@ The script runs:
 :app:assembleRelease
 ```
 
+The archive intentionally does not contain generated build output. When the Gradle wrapper JAR is absent, `build.sh` downloads Gradle 9.4.1 and verifies the official SHA-256 checksum before execution.
+
 Expected debug APK:
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Debug and release use the same application ID. Installing one replaces the other.
-
-To execute the device tests after building:
+To run connected tests after building:
 
 ```bash
-./gradlew connectedDebugAndroidTest
+./build.sh connectedDebugAndroidTest
 ```
 
 ## Optional release signing
@@ -78,16 +78,13 @@ CP_RELEASE_KEY_ALIAS
 CP_RELEASE_KEY_PASSWORD
 ```
 
-Without them, Gradle still verifies release compilation and shrinking but does not produce a distributable signed release APK.
+Without them, Gradle can validate release compilation and shrinking, but the release artifact is not suitable for distribution.
 
-## Permissions
+## Permissions and privacy
 
 - `READ_SMS` is requested only when the user checks the inbox or enables automatic inbox import.
 - `POST_NOTIFICATIONS` is required for visible ongoing journey tracking.
-- `SCHEDULE_EXACT_ALARM` is used for preferred T-60 activation. Inexact AlarmManager and WorkManager recovery remain available when exact access is unavailable.
-
-## Privacy
-
-SMS parsing is local. The app does not log SMS bodies, passenger names, ticket references, QR contents, or CP runtime headers. It uses read-only observed CP timetable/configuration endpoints and does not implement authenticated account or ticket-purchase operations.
-
-See `docs/CHANGELOG_0.6.0.md`, `docs/IMPLEMENTATION_STATUS.md`, and `docs/VALIDATION.md`.
+- `SCHEDULE_EXACT_ALARM` is used for preferred T-60 activation; inexact AlarmManager and WorkManager recovery remain available.
+- Notification-listener access is optional and protected by Android's binding permission.
+- SMS and notification parsing are local. The app does not log SMS bodies, passenger names, ticket references, QR contents, or CP runtime headers.
+- The app uses observed read-only CP timetable/configuration operations. Authenticated account, payment, ticket-purchase, card, and QR operations remain absent until their contract and authorization are verified.

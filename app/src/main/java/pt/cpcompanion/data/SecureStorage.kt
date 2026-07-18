@@ -33,7 +33,13 @@ class SecureStorage(context: Context) {
 
     fun get(key: String): String? {
         val encoded = prefs.getString(key, null) ?: return null
-        return runCatching { decrypt(encoded) }.getOrNull()
+        return runCatching { decrypt(encoded) }.getOrElse {
+            // A value can become unreadable after a device restore, key invalidation, or
+            // interrupted write. Remove only the damaged entry so the app can recover
+            // without repeatedly failing on every startup.
+            prefs.edit().remove(key).apply()
+            null
+        }
     }
 
     fun remove(key: String) {
@@ -63,9 +69,16 @@ class SecureStorage(context: Context) {
     }
 
     private fun decrypt(encoded: String): String {
-        val packed = ByteBuffer.wrap(Base64.decode(encoded, Base64.NO_WRAP))
+        val decoded = Base64.decode(encoded, Base64.NO_WRAP)
+        require(decoded.size in MIN_ENVELOPE_BYTES..MAX_ENVELOPE_BYTES) {
+            "Invalid encrypted value size"
+        }
+        val packed = ByteBuffer.wrap(decoded)
         val ivSize = packed.int
         require(ivSize in 12..32)
+        require(packed.remaining() >= ivSize + MIN_GCM_TAG_BYTES) {
+            "Invalid encrypted value envelope"
+        }
         val iv = ByteArray(ivSize).also { packed.get(it) }
         val encrypted = ByteArray(packed.remaining()).also { packed.get(it) }
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -92,5 +105,8 @@ class SecureStorage(context: Context) {
 
     private companion object {
         const val TRANSFORMATION = "AES/GCM/NoPadding"
+        const val MIN_GCM_TAG_BYTES = 16
+        const val MIN_ENVELOPE_BYTES = 4 + 12 + MIN_GCM_TAG_BYTES
+        const val MAX_ENVELOPE_BYTES = 4 * 1024 * 1024
     }
 }

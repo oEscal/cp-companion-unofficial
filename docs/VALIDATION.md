@@ -1,47 +1,42 @@
-# Validation report — 0.6.0
+# Validation report — 0.7.0
 
-## Source checks completed in this environment
+## Checks completed in this environment
 
-- Confirmed one Android application module and one application ID: `pt.cpcompanion`.
-- Confirmed version name 0.6.0, version code 8, and CP User-Agent 0.6.0.
-- Parsed every Android XML manifest/resource file.
-- Verified English and Portuguese resource-name parity and all referenced resources.
-- Checked shell syntax for `build.sh`.
-- Checked Kotlin/KTS delimiter balance and cross-file symbol visibility with source-level checks.
-- Verified the archive excludes previous APKs, Gradle build directories, local SDK paths, and keystores.
-- Included JVM regression tests for trip resolution, ticket-time behavior, station time zones, midnight service dates, API coordination, SMS parsing, and tracking-session claims.
-- Included Android tests for independent Room rows, navigation-state restoration, and ticket automation-switch visibility/default state.
+- Parsed every Android manifest/resource XML file.
+- Verified default/Portuguese string, plural, and array resource parity.
+- Verified Kotlin/XML resource references against declared resources.
+- Verified application ID, compile/target SDK, backup policy, cleartext policy, and Material 3 Expressive dependency invariants.
+- Checked shell syntax for `build.sh` and `gradlew`.
+- Checked Git whitespace/error conditions with `git diff --check`.
+- Reviewed exported components and validated external activity and receiver inputs.
+- Reviewed suspend failure paths and corrected cancellation swallowing in workers, ticket validation, imports, and UI requests.
+- Reviewed CP URL construction, runtime configuration validation, global 429 coordination, persistence writes, and encrypted-value recovery.
+- Verified no legacy Compose Material imports are used; all UI is under the Material 3 Expressive theme.
+- Verified the final archive excludes generated build products, local SDK configuration, captures, and signing material.
+
+Run the source-only checks directly with:
+
+```bash
+python3 tools/validate_source.py
+```
 
 ## Android build limitation
 
-This environment has no Android SDK, so Gradle Android compilation, lint, and device tests cannot be executed here. Run:
+Outbound DNS/network access was unavailable and no Android SDK or Gradle distribution was preinstalled. A fresh Gradle compile, lint execution, release shrink, and connected test run could not be performed against the modified source in this environment. Old generated reports from the supplied archive were treated as stale and are excluded from the delivery.
+
+Run on a configured machine or through the included GitHub Actions workflow:
 
 ```bash
 ./build.sh
+./build.sh connectedDebugAndroidTest
 ```
 
-Then execute connected tests on an emulator or device:
+## Required device validation
 
-```bash
-./gradlew connectedDebugAndroidTest
-```
-
-Expected debug output:
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-## Required device checks before release
-
-- Process dead/backgrounded at T-60, Doze, Battery Saver, and exact-alarm permission revocation.
-- Notification permission or tracking-channel revocation during a live journey.
-- Reboot, application update, clock change, and time-zone change.
-- Completed/cancelled journey followed by immediate reconciliation.
-- Disabling or deleting the actively tracked ticket.
-- Duplicate and progressively updated messaging notifications.
-- Concurrent manual and periodic inbox scans.
-- Station boards spanning midnight.
-- Two overlapping tickets and a delayed first trip.
-- HTTP 429 with delta-seconds and HTTP-date `Retry-After`.
-- Long journeys and foreground-service timeout behavior.
+- T-60 activation with process death, Doze, Battery Saver, exact-alarm revocation, reboot, update, clock change, and time-zone change.
+- Notification permission/channel revocation during a live session.
+- Android 16/17 promoted notification behavior and long routes with more than four progress points.
+- Two overlapping tickets, a delayed first journey, and service foreground-notification ownership transfer.
+- Temporary missing ETD/ETA, last-seen delay retention, cancellation/suppression, and destination completion.
+- Duplicate/progressively updated messaging notifications and concurrent inbox scans.
+- HTTP 429 with both delta-seconds and HTTP-date `Retry-After` values.

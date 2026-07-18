@@ -9,4 +9,4 @@
 - Exact time-zone semantics for cross-border ETA/ETD values.
 - Appropriate production polling quota for 10-second active tracking.
 
-Until these are verified, ticket import is manual and authenticated operations are intentionally absent.
+Tickets can be imported locally from forms, shared text, the opt-in SMS inbox, or strongly matched messaging notifications. Authenticated account, purchase, payment, card, and QR operations remain intentionally absent until the corresponding contract is verified.

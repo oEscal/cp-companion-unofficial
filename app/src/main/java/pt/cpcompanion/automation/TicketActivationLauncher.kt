@@ -10,7 +10,7 @@ import androidx.core.content.ContextCompat
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.model.TicketActivationMethod
 import pt.cpcompanion.model.TicketAutomationState
-import pt.cpcompanion.model.hasScheduledPassengerSegmentEnded
+import pt.cpcompanion.model.isClearlyPastForAutomation
 import pt.cpcompanion.notifications.TrackingNotificationFactory
 import pt.cpcompanion.tracking.TrackingSessionRegistry
 import pt.cpcompanion.tracking.TrainTrackingService
@@ -24,7 +24,7 @@ object TicketActivationLauncher {
         stores.awaitReady()
         val ticket = stores.ticket(ticketId) ?: return Result.FAILED
         if (!ticket.automaticTrackingEnabled) return Result.FAILED
-        if (ticket.hasScheduledPassengerSegmentEnded() && ticketId !in stores.activeTicketIds.value) {
+        if (ticket.isClearlyPastForAutomation() && ticketId !in stores.activeTicketIds.value) {
             TicketActivationScheduler.cancel(context, ticketId)
             stores.updateTicket(ticketId) { current ->
                 current.copy(

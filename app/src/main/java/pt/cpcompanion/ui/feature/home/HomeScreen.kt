@@ -213,8 +213,21 @@ private fun UpcomingHero(ticket: Ticket?, navigate: (AppScreen) -> Unit, startTr
                 Button(onClick = { navigate(AppScreen.Tickets) }) { Text(stringResource(R.string.add_ticket)) }
             } else {
                 Text(stringResource(R.string.next_saved_trip), style = MaterialTheme.typography.labelLarge)
-                Text("${ticket.serviceLabel ?: stringResource(R.string.train)} ${ticket.trainNumber}", style = MaterialTheme.typography.displaySmall)
-                Text("${ticket.originName ?: ticket.originStationCode} → ${ticket.destinationName ?: ticket.destinationStationCode}")
+                Text(
+                    stringResource(
+                        R.string.service_train_number,
+                        ticket.serviceLabel ?: stringResource(R.string.train),
+                        ticket.trainNumber,
+                    ),
+                    style = MaterialTheme.typography.displaySmall,
+                )
+                Text(
+                    stringResource(
+                        R.string.route_between,
+                        ticket.originName ?: ticket.originStationCode,
+                        ticket.destinationName ?: ticket.destinationStationCode,
+                    ),
+                )
                 Text(
                     listOfNotNull(ticket.serviceDate, ticket.departureTimingLabel()).joinToString(" · "),
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f),
@@ -266,12 +279,16 @@ private fun ActiveTrackingCard(
                 Column {
                     Text(snapshot.phase.label(), style = MaterialTheme.typography.labelLarge)
                     Text(
-                        "${snapshot.serviceLabel ?: "Train"} ${snapshot.trainNumber}",
+                        stringResource(
+                            R.string.service_train_number,
+                            snapshot.serviceLabel ?: stringResource(R.string.train),
+                            snapshot.trainNumber,
+                        ),
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 }
             }
-            Text("${snapshot.originName} → ${snapshot.destinationName}")
+            Text(stringResource(R.string.route_between, snapshot.originName, snapshot.destinationName))
             snapshot.expectedEventEpochMillis?.let {
                 Text(
                     timeRemaining(it),
@@ -286,7 +303,7 @@ private fun ActiveTrackingCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 snapshot.delayMinutes?.let { delay ->
                     StatusPill(
-                        if (delay > 0) "$delay min late" else "On time",
+                        if (delay > 0) stringResource(R.string.minutes_late, delay) else stringResource(R.string.on_time),
                         when {
                             delay >= 10 -> MaterialTheme.colorScheme.error
                             delay > 0 -> MaterialTheme.colorScheme.tertiary
@@ -301,7 +318,7 @@ private fun ActiveTrackingCard(
                 }
                 snapshot.platform?.let {
                     StatusPill(
-                        "Platform $it",
+                        stringResource(R.string.platform, it),
                         MaterialTheme.colorScheme.secondary,
                         MaterialTheme.colorScheme.onSecondary,
                     )
@@ -310,14 +327,14 @@ private fun ActiveTrackingCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 snapshot.carriage?.let {
                     StatusPill(
-                        "Carriage $it",
+                        stringResource(R.string.carriage_value, it),
                         MaterialTheme.colorScheme.primaryContainer,
                         MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
                 snapshot.seat?.let {
                     StatusPill(
-                        "Seat $it",
+                        stringResource(R.string.seat_value, it),
                         MaterialTheme.colorScheme.secondaryContainer,
                         MaterialTheme.colorScheme.onSecondaryContainer,
                         icon = R.drawable.ic_seat,
