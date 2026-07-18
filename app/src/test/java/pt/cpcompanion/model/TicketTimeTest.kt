@@ -76,7 +76,7 @@ class TicketTimeTest {
     }
 
     @Test
-    fun passedScheduledArrivalPreventsNewAutomaticSession() {
+    fun scheduledArrivalRemainsAvailableForUiHistoryClassification() {
         val now = 1_700_000_000_000L
         val ticket = ticket(
             serviceDate = "2023-11-14",

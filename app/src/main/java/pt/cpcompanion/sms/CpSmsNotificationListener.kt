@@ -105,14 +105,21 @@ class CpSmsNotificationListener : NotificationListenerService() {
     private fun extractBody(notification: Notification): String? {
         val extras = notification.extras
         val messagingText = extractMessagingMessages(notification).lastOrNull()?.text?.toString()
-        if (!messagingText.isNullOrBlank()) return messagingText
+        sanitizeBody(messagingText)?.let { return it }
+
         val direct = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
-        if (!direct.isNullOrBlank()) return direct
-        return extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-            ?.joinToString(" ") { it.toString() }
-            ?.takeIf(String::isNotBlank)
+        sanitizeBody(direct)?.let { return it }
+
+        val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.take(MAX_NOTIFICATION_TEXT_LINES)
+            ?.joinToString(" ") { it.toString().take(MAX_NOTIFICATION_LINE_CHARS) }
+        return sanitizeBody(lines)
     }
+
+    private fun sanitizeBody(value: String?): String? = value
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && it.length <= MAX_NOTIFICATION_BODY_CHARS }
 
     private fun extractMessagingMessages(notification: Notification): List<Notification.MessagingStyle.Message> {
         val rawBundles = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -202,5 +209,8 @@ class CpSmsNotificationListener : NotificationListenerService() {
     private companion object {
         const val CHANNEL_ID = "sms_ticket_imports"
         const val NOTIFICATION_ID = 4_201
+        const val MAX_NOTIFICATION_BODY_CHARS = 64 * 1024
+        const val MAX_NOTIFICATION_TEXT_LINES = 128
+        const val MAX_NOTIFICATION_LINE_CHARS = 1_024
     }
 }

@@ -79,6 +79,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -196,7 +198,7 @@ internal fun SearchScreen(
             ServiceDateField(
                 value = serviceDate,
                 onValueChange = { serviceDate = it },
-                label = "Train service date",
+                label = stringResource(R.string.train_service_date),
             )
         }
         item {
@@ -213,7 +215,16 @@ internal fun SearchScreen(
             }
         }
         if (!trainsOnly) {
-            item { SectionHeader(if (normalized.isBlank()) "Starred stations" else "Stations", stations.size) }
+            item {
+                SectionHeader(
+                    if (normalized.isBlank()) {
+                        stringResource(R.string.starred_stations)
+                    } else {
+                        stringResource(R.string.stations)
+                    },
+                    stations.size,
+                )
+            }
             items(stations, key = { it.code }) { station ->
                 StationResult(
                     station = station,
@@ -227,7 +238,7 @@ internal fun SearchScreen(
             }
         }
         if (!stationsOnly && normalized.isNotBlank()) {
-            item { SectionHeader("Trains", trains.size) }
+            item { SectionHeader(stringResource(R.string.trains), trains.size) }
             items(trains, key = { it.key }) { train ->
                 TrainResult(train) {
                     val date = LocalDate.parse(serviceDate)
@@ -238,8 +249,8 @@ internal fun SearchScreen(
         if (normalized.isNotBlank() && !state.catalogLoading && stations.isEmpty() && trains.isEmpty()) {
             item {
                 ExpressiveInfoCard(
-                    title = "No matches",
-                    body = "No station or train matched the current search. Pull down to refresh the CP catalogues.",
+                    title = stringResource(R.string.no_search_matches),
+                    body = stringResource(R.string.no_search_matches_body),
                 )
             }
         }
@@ -253,6 +264,9 @@ private fun StationResult(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
 ) {
+    val favoriteDescription = stringResource(
+        if (favorite) R.string.unfavorite_station_description else R.string.favorite_station_description,
+    )
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(24.dp),
@@ -272,7 +286,10 @@ private fun StationResult(
                 Text(station.name, style = MaterialTheme.typography.titleMedium)
                 Text(station.code, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = .72f))
             }
-            TextButton(onClick = onToggleFavorite) {
+            TextButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.semantics { contentDescription = favoriteDescription },
+            ) {
                 Text(if (favorite) "★" else "☆", style = MaterialTheme.typography.headlineSmall)
             }
         }
@@ -281,6 +298,9 @@ private fun StationResult(
 
 @Composable
 private fun TrainResult(train: TrainServiceEntry, onClick: () -> Unit) {
+    val defaultTrainName = stringResource(R.string.train)
+    val unknownOrigin = stringResource(R.string.unknown_origin)
+    val unknownDestination = stringResource(R.string.unknown_destination)
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(24.dp),
@@ -295,11 +315,15 @@ private fun TrainResult(train: TrainServiceEntry, onClick: () -> Unit) {
             Icon(painterResource(R.drawable.ic_train), contentDescription = stringResource(R.string.train_icon_description), modifier = Modifier.size(30.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    "${train.serviceName ?: "Train"} ${train.trainNumber}",
+                    stringResource(R.string.service_train_number, train.serviceName ?: defaultTrainName, train.trainNumber),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    "${train.origin?.name ?: "Unknown origin"} → ${train.destination?.name ?: "Unknown destination"}",
+                    stringResource(
+                        R.string.route_between,
+                        train.origin?.name ?: unknownOrigin,
+                        train.destination?.name ?: unknownDestination,
+                    ),
                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = .76f),
                 )
             }

@@ -4,6 +4,7 @@ import android.content.Context
 import java.security.MessageDigest
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -118,6 +119,8 @@ class AppStores(context: Context) {
         persistenceScope.launch {
             try {
                 loadPersistentState()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _persistenceError.value = "Local data could not be loaded: ${error.javaClass.simpleName}"
             } finally {
@@ -295,6 +298,7 @@ class AppStores(context: Context) {
         fingerprint: String? = null,
         message: String? = null,
         attemptedAtEpochMillis: Long? = null,
+        clearAttemptedAtEpochMillis: Boolean = false,
         completedAtEpochMillis: Long? = null,
         validationFailureCount: Int? = null,
     ): Ticket? = updateTicket(ticketId) { ticket ->
@@ -304,7 +308,11 @@ class AppStores(context: Context) {
             activationMethod = method ?: ticket.activationMethod,
             schedulingFingerprint = fingerprint ?: ticket.schedulingFingerprint,
             automationMessage = message,
-            lastAutomationAttemptEpochMillis = attemptedAtEpochMillis ?: ticket.lastAutomationAttemptEpochMillis,
+            lastAutomationAttemptEpochMillis = when {
+                clearAttemptedAtEpochMillis -> null
+                attemptedAtEpochMillis != null -> attemptedAtEpochMillis
+                else -> ticket.lastAutomationAttemptEpochMillis
+            },
             validationFailureCount = validationFailureCount ?: ticket.validationFailureCount,
             completedAtEpochMillis = completedAtEpochMillis ?: ticket.completedAtEpochMillis,
         )

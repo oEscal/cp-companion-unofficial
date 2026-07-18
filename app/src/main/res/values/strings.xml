@@ -61,8 +61,12 @@
     <string name="trip">Trip</string>
     <string name="stop_tracking">Stop tracking</string>
     <string name="search_hint">Station, code, train, origin, or destination</string>
+    <string name="train_service_date">Train service date</string>
+    <string name="starred_stations">Starred stations</string>
     <string name="stations">Stations</string>
     <string name="trains">Trains</string>
+    <string name="no_search_matches">No matches</string>
+    <string name="no_search_matches_body">No station or train matched the current search. Pull down to refresh the CP catalogues.</string>
     <string name="departures">Departures</string>
     <string name="arrivals">Arrivals</string>
     <string name="trip_unavailable">Trip information is unavailable</string>
@@ -154,10 +158,12 @@
     <string name="notification_access_disclosure">Android notification access can expose notifications from all apps. CP Companion filters message-like notifications, processes strong CP-ticket markers locally, does not upload notification content, and lets you revoke access at any time.</string>
     <plurals name="minutes_remaining">
         <item quantity="one">%d min</item>
+        <item quantity="many">%d min</item>
         <item quantity="other">%d min</item>
     </plurals>
     <plurals name="hours_remaining">
         <item quantity="one">%d hr</item>
+        <item quantity="many">%d hr</item>
         <item quantity="other">%d hr</item>
     </plurals>
     <string name="phase_approaching_origin">Approaching origin</string>
@@ -177,6 +183,12 @@
     <string name="delay_not_reported">Delay not reported</string>
     <string name="minutes_late">%1$d min late</string>
     <string name="on_time">On time</string>
+    <string name="delay_unknown">Delay unknown</string>
+    <string name="current_stop">Current</string>
+    <string name="passed_stop">Passed</string>
+    <string name="stop_skipped">Stop skipped</string>
+    <string name="your_origin">Your origin</string>
+    <string name="your_destination">Your destination</string>
     <string name="platform">Platform %1$s</string>
     <string name="carriage_value">Carriage %1$s</string>
     <string name="seat_value">Seat %1$s</string>
@@ -200,6 +212,7 @@
     <string name="promotion_unavailable">Live Update promotion is disabled or unavailable; standard ongoing notifications remain active</string>
     <plurals name="notification_import_count">
         <item quantity="one">CP ticket imported</item>
+        <item quantity="many">%d CP ticket legs imported</item>
         <item quantity="other">%d CP ticket legs imported</item>
     </plurals>
     <string name="ticket_import_channel_name">Ticket imports</string>
@@ -218,6 +231,23 @@
     <string name="upcoming">Upcoming</string>
     <string name="service_date">Service date</string>
     <string name="notification_permission_required_tracking">Notification permission is required for visible automatic trip tracking.</string>
+    <string name="selected_ticket_unavailable">The selected ticket is no longer available</string>
+    <string name="automation_state_reconciled">Automation state reconciled</string>
+    <string name="cp_configuration_refreshed">CP configuration and automation state refreshed</string>
+    <string name="paste_or_share_ticket_first">Paste or share a CP ticket SMS first</string>
+    <string name="ticket_saved_validating">Ticket saved; validating automatic tracking</string>
+    <string name="ticket_deleted">Ticket deleted</string>
+    <string name="past_departure_automation_unavailable">Automatic tracking cannot be enabled for a past departure</string>
+    <string name="choose_valid_passenger_segment">Choose an origin and a later destination from this train’s calling points</string>
+    <string name="ticket_saved_automatic">Ticket saved; tracking starts automatically one hour before departure</string>
+    <string name="ticket_stations_not_matched">This ticket’s stations could not be matched to CP’s current catalogue.</string>
+    <string name="tracking_started_early">Tracking started early</string>
+    <string name="ticket_already_tracked">This ticket is already being tracked</string>
+    <string name="enable_notifications_for_tracking">Enable notification permission to start tracking</string>
+    <string name="journey_queued">Another passenger journey is active; this ticket is queued</string>
+    <string name="android_blocked_tracking">Android blocked tracking startup</string>
+    <string name="tracking_stopped_disabled">Tracking stopped and disabled for this ticket</string>
+    <string name="unexpected_error">Unexpected error</string>
     <string name="sms_permission_denied_fallback">SMS access was not granted; paste or share the CP message instead.</string>
     <string name="sms_permission_required_auto_scan">Automatic CP SMS scanning requires SMS access.</string>
     <string name="live_update_promotion">Live Update promotion</string>
@@ -229,4 +259,41 @@
     <string name="no_matching_options">No matching options</string>
     <string name="loading_train_route">Loading this train route…</string>
     <string name="train_route_unavailable">This train route could not be loaded for the selected date.</string>
+    <string name="sms_auto_import_enabled">Automatic CP SMS inbox import enabled</string>
+    <string name="sms_auto_import_disabled">Automatic CP SMS inbox import disabled</string>
+    <string name="sms_read_failed">Could not read CP SMS messages</string>
+    <string name="shared_text_import_failed">The shared text could not be imported</string>
+    <string name="service_train_number">%1$s %2$s</string>
+    <string name="route_between">%1$s → %2$s</string>
+    <string name="shared_live_session">Shared live session</string>
+    <string name="shared_live_session_body">This screen observes the foreground tracking session and does not create a second trip poller.</string>
+    <string name="rate_limited">Rate limited</string>
+    <string name="rate_limited_resume_at">Showing the last successful trip response. CP requests resume at %1$s.</string>
+    <string name="rate_limited_waiting">Showing the last successful trip response until CP requests can resume.</string>
+    <string name="service_message">Service message</string>
+    <string name="calling_points">Calling points</string>
+    <string name="current_stop_description">Current stop</string>
+    <string name="passed_stop_description">Passed stop</string>
+    <string name="suppressed_stop_description">Suppressed stop</string>
+    <string name="upcoming_stop_description">Upcoming stop</string>
+    <string name="arrival_short">Arr %1$s</string>
+    <string name="eta_short">ETA %1$s</string>
+    <string name="departure_short">Dep %1$s</string>
+    <string name="etd_short">ETD %1$s</string>
+    <plurals name="sms_station_matching_issues">
+        <item quantity="one">%d leg still needs station matching.</item>
+        <item quantity="other">%d legs still need station matching.</item>
+    </plurals>
+    <plurals name="sms_imported_updated_count">
+        <item quantity="one">Imported or updated %d ticket leg; future tickets were scheduled automatically.</item>
+        <item quantity="other">Imported or updated %d ticket legs; future tickets were scheduled automatically.</item>
+    </plurals>
+    <string name="sms_ticket_already_imported">The ticket was already imported and its automatic tracking schedule is unchanged.</string>
+    <plurals name="sms_checked_no_recognizable_ticket">
+        <item quantity="one">Checked %d recent SMS message, but it did not contain a recognizable CP ticket.</item>
+        <item quantity="other">Checked %d recent SMS messages, but none contained a recognizable CP ticket.</item>
+    </plurals>
+    <string name="sms_found_no_ticket_created">A CP ticket SMS was found, but no ticket could be created.</string>
+    <string name="validating_passenger_segment">Validating the passenger segment</string>
+    <string name="automatic_tracking_reenabled">Automatic tracking re-enabled</string>
 </resources>

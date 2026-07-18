@@ -175,23 +175,28 @@ internal fun TripScreen(
         if (activeSnapshot != null) {
             item {
                 ExpressiveInfoCard(
-                    "Shared live session",
-                    "This screen observes the foreground tracking session and does not create a second trip poller.",
+                    stringResource(R.string.shared_live_session),
+                    stringResource(R.string.shared_live_session_body),
                 )
             }
         }
         if (trip.dataStale) {
             item {
                 ExpressiveInfoCard(
-                    "Rate limited",
+                    stringResource(R.string.rate_limited),
                     trip.cooldownUntilEpochMillis?.let {
-                        "Showing the last successful trip response. CP requests resume at ${timeLabel(it, trip.stops.firstOrNull()?.station?.code.orEmpty())}."
-                    } ?: "Showing the last successful trip response until CP requests can resume.",
+                        stringResource(
+                            R.string.rate_limited_resume_at,
+                            timeLabel(it, trip.stops.firstOrNull()?.station?.code.orEmpty()),
+                        )
+                    } ?: stringResource(R.string.rate_limited_waiting),
                 )
             }
         }
-        if (trip.messages.isNotEmpty()) item { ExpressiveInfoCard("Service message", trip.messages.joinToString("\n")) }
-        item { SectionHeader("Calling points", trip.stops.size) }
+        if (trip.messages.isNotEmpty()) {
+            item { ExpressiveInfoCard(stringResource(R.string.service_message), trip.messages.joinToString("\n")) }
+        }
+        item { SectionHeader(stringResource(R.string.calling_points), trip.stops.size) }
         itemsIndexed(trip.stops, key = { index, stop -> "$index-${stop.station.code}" }) { index, stop ->
             val visualState = when {
                 stop.isSuppressed -> TripStopVisualState.CANCELLED
@@ -224,10 +229,10 @@ internal fun TripScreen(
                     Icon(
                         painterResource(if (visualState == TripStopVisualState.CURRENT) R.drawable.ic_train else R.drawable.ic_station),
                         contentDescription = when (visualState) {
-                            TripStopVisualState.CURRENT -> "Current stop"
-                            TripStopVisualState.PASSED -> "Passed stop"
-                            TripStopVisualState.CANCELLED -> "Suppressed stop"
-                            TripStopVisualState.UPCOMING -> "Upcoming stop"
+                            TripStopVisualState.CURRENT -> stringResource(R.string.current_stop_description)
+                            TripStopVisualState.PASSED -> stringResource(R.string.passed_stop_description)
+                            TripStopVisualState.CANCELLED -> stringResource(R.string.suppressed_stop_description)
+                            TripStopVisualState.UPCOMING -> stringResource(R.string.upcoming_stop_description)
                         },
                         tint = contentColor,
                     )
@@ -241,29 +246,33 @@ internal fun TripScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             when (visualState) {
-                                TripStopVisualState.CURRENT -> StatusPill("Current", MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
-                                TripStopVisualState.PASSED -> StatusPill("Passed", MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurfaceVariant)
-                                TripStopVisualState.CANCELLED -> StatusPill("Stop skipped", MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
+                                TripStopVisualState.CURRENT -> StatusPill(stringResource(R.string.current_stop), MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary)
+                                TripStopVisualState.PASSED -> StatusPill(stringResource(R.string.passed_stop), MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurfaceVariant)
+                                TripStopVisualState.CANCELLED -> StatusPill(stringResource(R.string.stop_skipped), MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
                                 TripStopVisualState.UPCOMING -> Unit
                             }
                         }
                         Text(stop.station.code, color = contentColor.copy(alpha = .68f))
                         Text(
                             listOfNotNull(
-                                stop.scheduledArrival?.let { "Arr $it" },
-                                stop.expectedArrival?.takeIf { it != stop.scheduledArrival }?.let { "ETA $it" },
-                                stop.scheduledDeparture?.let { "Dep $it" },
-                                stop.expectedDeparture?.takeIf { it != stop.scheduledDeparture }?.let { "ETD $it" },
-                                stop.platform?.let { "Platform $it" },
+                                stop.scheduledArrival?.let { stringResource(R.string.arrival_short, it) },
+                                stop.expectedArrival?.takeIf { it != stop.scheduledArrival }?.let {
+                                    stringResource(R.string.eta_short, it)
+                                },
+                                stop.scheduledDeparture?.let { stringResource(R.string.departure_short, it) },
+                                stop.expectedDeparture?.takeIf { it != stop.scheduledDeparture }?.let {
+                                    stringResource(R.string.etd_short, it)
+                                },
+                                stop.platform?.let { stringResource(R.string.platform, it) },
                             ).joinToString(" · "),
                             color = contentColor.copy(alpha = .84f),
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (existingTicket?.originStationCode == stop.station.code) {
-                                StatusPill("Your origin", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+                                StatusPill(stringResource(R.string.your_origin), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
                             }
                             if (existingTicket?.destinationStationCode == stop.station.code) {
-                                StatusPill("Your destination", MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.onSecondary)
+                                StatusPill(stringResource(R.string.your_destination), MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.onSecondary)
                             }
                         }
                     }
@@ -321,20 +330,31 @@ private fun TripHero(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("${trip.serviceName ?: stringResource(R.string.train)} ${trip.trainNumber}", style = MaterialTheme.typography.displaySmall)
             Text(
-                "${trip.stops.firstOrNull()?.station?.name ?: "Origin"} → ${trip.stops.lastOrNull()?.station?.name ?: "Destination"}",
+                stringResource(
+                    R.string.service_train_number,
+                    trip.serviceName ?: stringResource(R.string.train),
+                    trip.trainNumber,
+                ),
+                style = MaterialTheme.typography.displaySmall,
+            )
+            Text(
+                stringResource(
+                    R.string.route_between,
+                    trip.stops.firstOrNull()?.station?.name ?: stringResource(R.string.unknown_origin),
+                    trip.stops.lastOrNull()?.station?.name ?: stringResource(R.string.unknown_destination),
+                ),
                 style = MaterialTheme.typography.titleMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
-                    delay == null -> StatusPill("Delay unknown", MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurfaceVariant)
+                    delay == null -> StatusPill(stringResource(R.string.delay_unknown), MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurfaceVariant)
                     delay > 0 -> StatusPill(
-                        "$delay min late",
+                        stringResource(R.string.minutes_late, delay),
                         if (delay >= 10) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
                         if (delay >= 10) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onTertiary,
                     )
-                    else -> StatusPill("On time", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+                    else -> StatusPill(stringResource(R.string.on_time), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
                 }
                 normalizedStatus?.let { StatusPill(it, statusContainer, statusContent) }
             }
@@ -347,8 +367,8 @@ private fun TripHero(
             ticket?.let {
                 Text(it.automationStatusLabel(), color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .8f))
                 val seatText = listOfNotNull(
-                    it.carriage?.let { c -> "Carriage $c" },
-                    it.seat?.let { seat -> "Seat $seat" },
+                    it.carriage?.let { c -> stringResource(R.string.carriage_value, c) },
+                    it.seat?.let { seat -> stringResource(R.string.seat_value, seat) },
                 ).joinToString(" · ")
                 if (seatText.isNotBlank()) {
                     StatusPill(

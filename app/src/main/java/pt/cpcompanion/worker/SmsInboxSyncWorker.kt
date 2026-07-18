@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CancellationException
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.sms.SmsImportCoordinator
 
@@ -22,18 +23,18 @@ class SmsInboxSyncWorker(
             PackageManager.PERMISSION_GRANTED
         ) return Result.success()
 
-        return runCatching {
+        return try {
             SmsImportCoordinator.scanInbox(
                 context = applicationContext,
                 stations = container.repository.cachedStations(),
                 requireAutomaticOptIn = true,
             )
-        }.fold(
-            onSuccess = { Result.success() },
-            onFailure = {
-                SmsImportCoordinator.recordFailedScan(applicationContext)
-                Result.retry()
-            },
-        )
+            Result.success()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            SmsImportCoordinator.recordFailedScan(applicationContext)
+            Result.retry()
+        }
     }
 }

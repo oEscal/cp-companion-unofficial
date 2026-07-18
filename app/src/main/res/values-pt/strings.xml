@@ -61,8 +61,12 @@
     <string name="trip">Viagem</string>
     <string name="stop_tracking">Parar acompanhamento</string>
     <string name="search_hint">Estação, código, comboio, origem ou destino</string>
+    <string name="train_service_date">Data de circulação do comboio</string>
+    <string name="starred_stations">Estações favoritas</string>
     <string name="stations">Estações</string>
     <string name="trains">Comboios</string>
+    <string name="no_search_matches">Sem resultados</string>
+    <string name="no_search_matches_body">Nenhuma estação ou comboio corresponde à pesquisa atual. Deslize para atualizar os catálogos da CP.</string>
     <string name="departures">Partidas</string>
     <string name="arrivals">Chegadas</string>
     <string name="trip_unavailable">A informação da viagem não está disponível</string>
@@ -154,10 +158,12 @@
     <string name="notification_access_disclosure">O acesso às notificações do Android pode expor notificações de todas as aplicações. O CP Companion filtra notificações semelhantes a mensagens, processa localmente marcadores fortes de bilhetes da CP, não envia o conteúdo das notificações e permite revogar o acesso em qualquer momento.</string>
     <plurals name="minutes_remaining">
         <item quantity="one">%d min</item>
+        <item quantity="many">%d min</item>
         <item quantity="other">%d min</item>
     </plurals>
     <plurals name="hours_remaining">
         <item quantity="one">%d h</item>
+        <item quantity="many">%d h</item>
         <item quantity="other">%d h</item>
     </plurals>
     <string name="phase_approaching_origin">A aproximar-se da origem</string>
@@ -177,6 +183,12 @@
     <string name="delay_not_reported">Atraso não indicado</string>
     <string name="minutes_late">%1$d min de atraso</string>
     <string name="on_time">A horas</string>
+    <string name="delay_unknown">Atraso desconhecido</string>
+    <string name="current_stop">Atual</string>
+    <string name="passed_stop">Já passou</string>
+    <string name="stop_skipped">Paragem suprimida</string>
+    <string name="your_origin">A sua origem</string>
+    <string name="your_destination">O seu destino</string>
     <string name="platform">Plataforma %1$s</string>
     <string name="carriage_value">Carruagem %1$s</string>
     <string name="seat_value">Lugar %1$s</string>
@@ -200,6 +212,7 @@
     <string name="promotion_unavailable">A promoção para atualização em direto está desativada ou indisponível; as notificações contínuas normais permanecem ativas</string>
     <plurals name="notification_import_count">
         <item quantity="one">%d bilhete da CP importado</item>
+        <item quantity="many">%d trajetos de bilhete da CP importados</item>
         <item quantity="other">%d trajetos de bilhete da CP importados</item>
     </plurals>
     <string name="ticket_import_channel_name">Importações de bilhetes</string>
@@ -218,6 +231,23 @@
     <string name="upcoming">Próximo</string>
     <string name="service_date">Data do serviço</string>
     <string name="notification_permission_required_tracking">A permissão de notificações é necessária para mostrar o acompanhamento automático da viagem.</string>
+    <string name="selected_ticket_unavailable">O bilhete selecionado já não está disponível</string>
+    <string name="automation_state_reconciled">Estado do acompanhamento automático reconciliado</string>
+    <string name="cp_configuration_refreshed">Configuração da CP e estado do acompanhamento atualizados</string>
+    <string name="paste_or_share_ticket_first">Cole ou partilhe primeiro um SMS de bilhete da CP</string>
+    <string name="ticket_saved_validating">Bilhete guardado; a validar o acompanhamento automático</string>
+    <string name="ticket_deleted">Bilhete eliminado</string>
+    <string name="past_departure_automation_unavailable">O acompanhamento automático não pode ser ativado após a partida</string>
+    <string name="choose_valid_passenger_segment">Escolha uma origem e um destino posterior na lista de paragens deste comboio</string>
+    <string name="ticket_saved_automatic">Bilhete guardado; o acompanhamento começa automaticamente uma hora antes da partida</string>
+    <string name="ticket_stations_not_matched">Não foi possível associar as estações deste bilhete ao catálogo atual da CP.</string>
+    <string name="tracking_started_early">Acompanhamento iniciado antecipadamente</string>
+    <string name="ticket_already_tracked">Este bilhete já está a ser acompanhado</string>
+    <string name="enable_notifications_for_tracking">Ative a permissão de notificações para iniciar o acompanhamento</string>
+    <string name="journey_queued">Está ativa outra viagem; este bilhete ficou em fila</string>
+    <string name="android_blocked_tracking">O Android bloqueou o início do acompanhamento</string>
+    <string name="tracking_stopped_disabled">Acompanhamento parado e desativado para este bilhete</string>
+    <string name="unexpected_error">Erro inesperado</string>
     <string name="sms_permission_denied_fallback">O acesso aos SMS não foi autorizado; cole ou partilhe a mensagem da CP.</string>
     <string name="sms_permission_required_auto_scan">A análise automática dos SMS da CP requer acesso aos SMS.</string>
     <string name="live_update_promotion">Promoção da atualização em direto</string>
@@ -229,4 +259,44 @@
     <string name="no_matching_options">Sem opções correspondentes</string>
     <string name="loading_train_route">A carregar o percurso deste comboio…</string>
     <string name="train_route_unavailable">Não foi possível carregar o percurso deste comboio para a data selecionada.</string>
+    <string name="sms_auto_import_enabled">Importação automática da caixa de SMS da CP ativada</string>
+    <string name="sms_auto_import_disabled">Importação automática da caixa de SMS da CP desativada</string>
+    <string name="sms_read_failed">Não foi possível ler as mensagens SMS da CP</string>
+    <string name="shared_text_import_failed">Não foi possível importar o texto partilhado</string>
+    <string name="service_train_number">%1$s %2$s</string>
+    <string name="route_between">%1$s → %2$s</string>
+    <string name="shared_live_session">Sessão em direto partilhada</string>
+    <string name="shared_live_session_body">Este ecrã observa a sessão de acompanhamento em primeiro plano e não cria uma segunda consulta periódica da viagem.</string>
+    <string name="rate_limited">Pedidos limitados</string>
+    <string name="rate_limited_resume_at">A mostrar a última resposta válida da viagem. Os pedidos à CP recomeçam às %1$s.</string>
+    <string name="rate_limited_waiting">A mostrar a última resposta válida da viagem até ser possível retomar os pedidos à CP.</string>
+    <string name="service_message">Mensagem de serviço</string>
+    <string name="calling_points">Paragens</string>
+    <string name="current_stop_description">Paragem atual</string>
+    <string name="passed_stop_description">Paragem já ultrapassada</string>
+    <string name="suppressed_stop_description">Paragem suprimida</string>
+    <string name="upcoming_stop_description">Próxima paragem</string>
+    <string name="arrival_short">Cheg. %1$s</string>
+    <string name="eta_short">ETA %1$s</string>
+    <string name="departure_short">Part. %1$s</string>
+    <string name="etd_short">ETD %1$s</string>
+    <plurals name="sms_station_matching_issues">
+        <item quantity="one">%d trajeto ainda precisa de associação de estações.</item>
+        <item quantity="many">%d trajetos ainda precisam de associação de estações.</item>
+        <item quantity="other">%d trajetos ainda precisam de associação de estações.</item>
+    </plurals>
+    <plurals name="sms_imported_updated_count">
+        <item quantity="one">Foi importado ou atualizado %d trajeto de bilhete; os bilhetes futuros foram agendados automaticamente.</item>
+        <item quantity="many">Foram importados ou atualizados %d trajetos de bilhete; os bilhetes futuros foram agendados automaticamente.</item>
+        <item quantity="other">Foram importados ou atualizados %d trajetos de bilhete; os bilhetes futuros foram agendados automaticamente.</item>
+    </plurals>
+    <string name="sms_ticket_already_imported">O bilhete já tinha sido importado e o respetivo agendamento de acompanhamento automático não foi alterado.</string>
+    <plurals name="sms_checked_no_recognizable_ticket">
+        <item quantity="one">Foi verificada %d mensagem SMS recente, mas não continha um bilhete da CP reconhecível.</item>
+        <item quantity="many">Foram verificadas %d mensagens SMS recentes, mas nenhuma continha um bilhete da CP reconhecível.</item>
+        <item quantity="other">Foram verificadas %d mensagens SMS recentes, mas nenhuma continha um bilhete da CP reconhecível.</item>
+    </plurals>
+    <string name="sms_found_no_ticket_created">Foi encontrada uma mensagem SMS de bilhete da CP, mas não foi possível criar um bilhete.</string>
+    <string name="validating_passenger_segment">A validar o trajeto do passageiro</string>
+    <string name="automatic_tracking_reenabled">Acompanhamento automático reativado</string>
 </resources>

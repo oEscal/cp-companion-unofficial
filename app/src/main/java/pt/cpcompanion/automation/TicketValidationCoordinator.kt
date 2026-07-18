@@ -5,6 +5,7 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.time.format.DateTimeParseException
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.domain.TripResolutionException
@@ -26,43 +27,43 @@ object TicketValidationCoordinator {
     suspend fun validateAndSchedule(context: Context, source: Ticket): Outcome {
         val app = context.applicationContext as TrainTrackerApplication
         val currentSource = app.container.stores.ticket(source.id) ?: source
-        return runCatching { TicketAutomationValidator.validate(context, currentSource) }.fold(
-            onSuccess = { validated ->
-                TicketActivationScheduler.schedule(context, validated, force = true)
-                Outcome(
-                    ticket = validated,
-                    validated = true,
-                    shouldRetry = false,
-                    message = "Ticket validated; automatic tracking is scheduled",
+        return try {
+            val validated = TicketAutomationValidator.validate(context, currentSource)
+            TicketActivationScheduler.schedule(context, validated, force = true)
+            Outcome(
+                ticket = validated,
+                validated = true,
+                shouldRetry = false,
+                message = "Ticket validated; automatic tracking is scheduled",
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            val classification = classify(error)
+            val latest = app.container.stores.ticket(currentSource.id) ?: currentSource
+            val failures = latest.validationFailureCount + 1
+            val exhausted = classification.maxAttempts?.let { failures >= it } == true
+            val permanent = !classification.transient || exhausted
+            val message = when {
+                !classification.transient -> classification.message
+                exhausted -> "Validation failed repeatedly: ${classification.message}"
+                else -> "Validation will retry automatically: ${classification.message}"
+            }
+            val updated = app.container.stores.updateTicket(currentSource.id) { current ->
+                current.copy(
+                    automaticTrackingEnabled = if (permanent) false else current.automaticTrackingEnabled,
+                    automationState = if (permanent) TicketAutomationState.FAILED else TicketAutomationState.NEEDS_VALIDATION,
+                    activationEpochMillis = if (permanent) null else current.activationEpochMillis,
+                    activationMethod = if (permanent) TicketActivationMethod.NONE else current.activationMethod,
+                    schedulingFingerprint = if (permanent) null else current.schedulingFingerprint,
+                    automationMessage = if (permanent) "$message. Re-enable automatic tracking after correcting the ticket." else message,
+                    lastAutomationAttemptEpochMillis = System.currentTimeMillis(),
+                    validationFailureCount = failures,
                 )
-            },
-            onFailure = { error ->
-                val classification = classify(error)
-                val latest = app.container.stores.ticket(currentSource.id) ?: currentSource
-                val failures = latest.validationFailureCount + 1
-                val exhausted = classification.maxAttempts?.let { failures >= it } == true
-                val permanent = !classification.transient || exhausted
-                val message = when {
-                    !classification.transient -> classification.message
-                    exhausted -> "Validation failed repeatedly: ${classification.message}"
-                    else -> "Validation will retry automatically: ${classification.message}"
-                }
-                val updated = app.container.stores.updateTicket(currentSource.id) { current ->
-                    current.copy(
-                        automaticTrackingEnabled = if (permanent) false else current.automaticTrackingEnabled,
-                        automationState = if (permanent) TicketAutomationState.FAILED else TicketAutomationState.NEEDS_VALIDATION,
-                        activationEpochMillis = if (permanent) null else current.activationEpochMillis,
-                        activationMethod = if (permanent) TicketActivationMethod.NONE else current.activationMethod,
-                        schedulingFingerprint = if (permanent) null else current.schedulingFingerprint,
-                        automationMessage = if (permanent) "$message. Re-enable automatic tracking after correcting the ticket." else message,
-                        lastAutomationAttemptEpochMillis = System.currentTimeMillis(),
-                        validationFailureCount = failures,
-                    )
-                } ?: currentSource
-                if (permanent) TicketActivationScheduler.cancel(context, currentSource.id)
-                Outcome(updated, validated = false, shouldRetry = !permanent, message = message)
-            },
-        )
+            } ?: currentSource
+            if (permanent) TicketActivationScheduler.cancel(context, currentSource.id)
+            Outcome(updated, validated = false, shouldRetry = !permanent, message = message)
+        }
     }
 
     private fun classify(error: Throwable): FailureClassification = when (error) {

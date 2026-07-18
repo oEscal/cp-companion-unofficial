@@ -1,10 +1,12 @@
 package pt.cpcompanion.network
 
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CpRequestCoordinatorTest {
@@ -101,6 +103,40 @@ class CpRequestCoordinatorTest {
         assertEquals("last-known", response.value)
         assertEquals(true, response.stale)
         assertEquals(original.fetchedAtEpochMillis, response.fetchedAtEpochMillis)
+    }
+
+
+    @Test
+    fun concurrent429ResponsesCannotShortenTheGlobalCooldown() = runBlocking {
+        val coordinator = CpRequestCoordinator(rateLimitEnabled = false)
+        val started = AtomicInteger()
+        val release = CompletableDeferred<Unit>()
+        val longerRetry = System.currentTimeMillis() + 120_000L
+
+        fun request(key: String, retryAt: Long) = async {
+            runCatching {
+                coordinator.execute<String>(key, ttlMillis = 0L) {
+                    started.incrementAndGet()
+                    release.await()
+                    throw ApiHttpException(
+                        statusCode = 429,
+                        retryAfterEpochMillis = retryAt,
+                        endpointFamily = "TRAVEL",
+                        requestKey = key,
+                        message = "rate limited",
+                    )
+                }
+            }
+        }
+
+        val longer = request("travel:/trip/longer", longerRetry)
+        val shorter = request("travel:/trip/shorter", System.currentTimeMillis() + 10_000L)
+        while (started.get() < 2) delay(1L)
+        release.complete(Unit)
+        longer.await()
+        shorter.await()
+
+        assertTrue(checkNotNull(coordinator.cooldownUntil()) >= longerRetry)
     }
 
     @Test
