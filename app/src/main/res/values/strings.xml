@@ -206,6 +206,16 @@
     <string name="ticket_import_channel_description">Confirmation after a CP ticket SMS is imported</string>
     <string name="notification_listener_label">CP ticket detection</string>
     <string name="train_number_label">Train number</string>
+    <string name="search_station_trips">Search trips at this station</string>
+    <string name="no_services">No services</string>
+    <string name="no_services_for_date">No services were returned for the selected date and board.</string>
+    <string name="no_matching_trips">No matching trips</string>
+    <string name="no_matching_trips_body">No trip on this board matches the current search.</string>
+    <string name="unknown_destination">Unknown destination</string>
+    <string name="unknown_origin">Unknown origin</string>
+    <string name="cancelled">Cancelled</string>
+    <string name="finished">Finished</string>
+    <string name="upcoming">Upcoming</string>
     <string name="service_date">Service date</string>
     <string name="notification_permission_required_tracking">Notification permission is required for visible automatic trip tracking.</string>
     <string name="sms_permission_denied_fallback">SMS access was not granted; paste or share the CP message instead.</string>

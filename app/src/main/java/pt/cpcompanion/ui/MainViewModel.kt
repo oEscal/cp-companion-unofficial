@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.ZoneId
 import java.util.ArrayDeque
@@ -72,6 +73,7 @@ data class MainUiState(
     val selectedStationDetails: StationDetails? = null,
     val stationBoard: List<StationBoardEntry> = emptyList(),
     val boardDepartures: Boolean = true,
+    val stationBoardDate: String = LocalDate.now().toString(),
     val selectedTrip: TrainTrip? = null,
     val loading: Boolean = false,
     val catalogLoading: Boolean = false,
@@ -115,6 +117,7 @@ class MainViewModel(
     private val _state = MutableStateFlow(
         MainUiState(
             screen = restoredScreen,
+            stationBoardDate = savedStateHandle.get<String>(KEY_STATION_BOARD_DATE) ?: LocalDate.now().toString(),
             canGoBack = hasBackDestination(restoredScreen),
         ),
     )
@@ -304,6 +307,16 @@ class MainViewModel(
         loadBoard(screen.station.code, departures)
     }
 
+    fun setStationBoardDate(value: String) {
+        val date = runCatching { LocalDate.parse(value) }.getOrNull() ?: return
+        val normalized = date.toString()
+        if (_state.value.stationBoardDate == normalized) return
+        savedStateHandle[KEY_STATION_BOARD_DATE] = normalized
+        _state.value = _state.value.copy(stationBoardDate = normalized, stationBoard = emptyList())
+        val screen = _state.value.screen as? AppScreen.StationScreen ?: return
+        loadBoard(screen.station.code, _state.value.boardDepartures)
+    }
+
     fun openBoardTrip(entry: StationBoardEntry) {
         navigate(AppScreen.TripScreen(entry.trainNumber, entry.serviceDate))
     }
@@ -322,6 +335,8 @@ class MainViewModel(
 
     fun refreshCurrentStationBoard() {
         val screen = _state.value.screen as? AppScreen.StationScreen ?: return
+        val selectedDate = runCatching { LocalDate.parse(_state.value.stationBoardDate) }.getOrNull() ?: return
+        if (selectedDate != ZonedDateTime.now(stationZone(screen.station.code)).toLocalDate()) return
         loadBoard(screen.station.code, _state.value.boardDepartures, showLoading = false, forceRefresh = true)
     }
 
@@ -629,9 +644,10 @@ class MainViewModel(
         forceRefresh: Boolean = false,
     ) {
         boardLoadJob?.cancel()
-        val zone = stationZone(stationCode)
-        val now = ZonedDateTime.now(zone)
-        val logicalKey = "$stationCode|$departures|${now.toLocalDate()}|${now.hour}:${now.minute / 5}"
+        val selectedDate = runCatching { LocalDate.parse(_state.value.stationBoardDate) }
+            .getOrElse { LocalDate.now(stationZone(stationCode)) }
+        val requestStart = LocalTime.MIDNIGHT
+        val logicalKey = "$stationCode|$departures|$selectedDate"
         val key = "$logicalKey|${++boardRequestSequence}"
         boardRequestKey = key
         _state.value = _state.value.copy(boardLoading = true)
@@ -640,9 +656,9 @@ class MainViewModel(
             try {
                 val board = container.repository.stationBoard(
                     stationCode,
-                    now.toLocalDate(),
+                    selectedDate,
                     departures,
-                    now.toLocalTime(),
+                    requestStart,
                     forceRefresh,
                 )
                 val activeStation = (_state.value.screen as? AppScreen.StationScreen)?.station?.code
@@ -767,6 +783,7 @@ class MainViewModel(
     companion object {
         private const val KEY_SCREEN = "navigation_screen"
         private const val KEY_BACK_STACK = "navigation_back_stack"
+        private const val KEY_STATION_BOARD_DATE = "station_board_date"
 
         fun factory(application: Application, container: AppContainer): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

@@ -218,7 +218,10 @@ internal fun SearchScreen(
                 StationResult(
                     station = station,
                     favorite = station.code in state.favoriteStationCodes,
-                    onClick = { navigate(AppScreen.StationScreen(station)) },
+                    onClick = {
+                        viewModel.setStationBoardDate(serviceDate)
+                        navigate(AppScreen.StationScreen(station))
+                    },
                     onToggleFavorite = { viewModel.toggleFavoriteStation(station.code) },
                 )
             }
