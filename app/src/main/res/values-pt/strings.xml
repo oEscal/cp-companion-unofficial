@@ -206,6 +206,16 @@
     <string name="ticket_import_channel_description">Confirmação após a importação de um SMS de bilhete da CP</string>
     <string name="notification_listener_label">Deteção de bilhetes da CP</string>
     <string name="train_number_label">Número do comboio</string>
+    <string name="search_station_trips">Pesquisar viagens nesta estação</string>
+    <string name="no_services">Sem serviços</string>
+    <string name="no_services_for_date">Não foram devolvidos serviços para a data e o painel selecionados.</string>
+    <string name="no_matching_trips">Sem viagens correspondentes</string>
+    <string name="no_matching_trips_body">Nenhuma viagem neste painel corresponde à pesquisa atual.</string>
+    <string name="unknown_destination">Destino desconhecido</string>
+    <string name="unknown_origin">Origem desconhecida</string>
+    <string name="cancelled">Cancelado</string>
+    <string name="finished">Terminado</string>
+    <string name="upcoming">Próximo</string>
     <string name="service_date">Data do serviço</string>
     <string name="notification_permission_required_tracking">A permissão de notificações é necessária para mostrar o acompanhamento automático da viagem.</string>
     <string name="sms_permission_denied_fallback">O acesso aos SMS não foi autorizado; cole ou partilhe a mensagem da CP.</string>
