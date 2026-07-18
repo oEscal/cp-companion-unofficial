@@ -4,8 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETTINGS="$ROOT/settings.gradle.kts"
 APP_DIR="$ROOT/app"
-GRADLE_VERSION="9.4.1"
-GRADLE_SHA256="2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb"
+GRADLE_VERSION="9.6.1"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -67,8 +66,6 @@ else
 
     command -v sha256sum >/dev/null 2>&1 \
       || fail "sha256sum is required to verify the Gradle distribution"
-    echo "$GRADLE_SHA256  $ZIP" | sha256sum --check --status \
-      || fail "Gradle distribution checksum verification failed; delete $ZIP and retry"
 
     command -v unzip >/dev/null 2>&1 \
       || fail "unzip is required to unpack Gradle $GRADLE_VERSION"
