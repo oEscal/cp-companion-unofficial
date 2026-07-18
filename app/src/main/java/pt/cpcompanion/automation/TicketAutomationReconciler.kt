@@ -7,7 +7,6 @@ import androidx.work.WorkManager
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.model.TicketActivationMethod
 import pt.cpcompanion.model.TicketAutomationState
-import pt.cpcompanion.model.hasScheduledPassengerSegmentEnded
 import pt.cpcompanion.model.isClearlyPastForAutomation
 import pt.cpcompanion.tracking.TrackingSessionRegistry
 
@@ -44,7 +43,7 @@ object TicketAutomationReconciler {
                 }
                 return@forEach
             }
-            if (ticket.hasScheduledPassengerSegmentEnded(now) || ticket.isClearlyPastForAutomation(nowEpochMillis = now)) {
+            if (ticket.isClearlyPastForAutomation(nowEpochMillis = now)) {
                 stores.updateTicket(ticket.id) {
                     it.copy(
                         automaticTrackingEnabled = false,
@@ -64,7 +63,6 @@ object TicketAutomationReconciler {
                 TicketActivationScheduler.cancel(context, ticket.id)
                 return@forEach
             }
-            val arrival = ticket.scheduledArrivalEpochMillis
             if (ticket.scheduledDepartureEpochMillis == null) {
                 if (ticket.automationState == TicketAutomationState.FAILED) {
                     TicketActivationScheduler.cancel(context, ticket.id)
@@ -84,7 +82,7 @@ object TicketAutomationReconciler {
                 return@forEach
             }
             val activationAt = ticket.scheduledDepartureEpochMillis - TicketActivationScheduler.LEAD_TIME_MS
-            if (activationAt <= now && (arrival == null || arrival > now)) {
+            if (activationAt <= now) {
                 TicketActivationLauncher.activate(context, ticket.id, "reconciliation")
             } else {
                 TicketActivationScheduler.schedule(context, ticket)

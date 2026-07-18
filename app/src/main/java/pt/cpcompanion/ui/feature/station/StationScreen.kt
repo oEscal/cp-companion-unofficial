@@ -210,7 +210,11 @@ private fun BoardEntryCard(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text(
-                    "${entry.serviceName ?: stringResource(R.string.train)} ${entry.trainNumber}",
+                    stringResource(
+                        R.string.service_train_number,
+                        entry.serviceName ?: stringResource(R.string.train),
+                        entry.trainNumber,
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(

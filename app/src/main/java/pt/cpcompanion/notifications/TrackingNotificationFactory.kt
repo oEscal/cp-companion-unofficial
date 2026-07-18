@@ -1,6 +1,7 @@
 package pt.cpcompanion.notifications
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.app.Notification
@@ -13,7 +14,6 @@ import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -139,6 +139,7 @@ class TrackingNotificationFactory(private val context: Context) {
     }
 
     @RequiresApi(36)
+    @SuppressLint("InlinedApi")
     private fun buildProgressNotification(snapshot: TrackingSnapshot): Notification {
         val content = content(snapshot)
         val progressMax = snapshot.progressMax.coerceAtLeast(2)
@@ -146,13 +147,6 @@ class TrackingNotificationFactory(private val context: Context) {
         val pointPositions = visiblePointPositions(
             markers = snapshot.progressMarkers,
             progressMax = progressMax,
-        )
-        logPointLayoutIfChanged(
-            snapshot = snapshot,
-            pointPositions = pointPositions,
-            progress = progress,
-            progressMax = progressMax,
-            usesAllStopsWorkaround = pointPositions.size > MAX_RELIABLY_RENDERED_NATIVE_POINTS,
         )
         val useAllStopsWorkaround = pointPositions.size > MAX_RELIABLY_RENDERED_NATIVE_POINTS
         val styleProgress = if (useAllStopsWorkaround) progressMax else progress
@@ -473,28 +467,6 @@ class TrackingNotificationFactory(private val context: Context) {
             .putExtra(TrainTrackingService.EXTRA_TICKET_ID, ticketId),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
-
-
-    private fun logPointLayoutIfChanged(
-        snapshot: TrackingSnapshot,
-        pointPositions: List<Int>,
-        progress: Int,
-        progressMax: Int,
-        usesAllStopsWorkaround: Boolean,
-    ) {
-        val signature = "$progressMax|${pointPositions.joinToString(",")}|$usesAllStopsWorkaround"
-        if (pointLayoutSignatures.put(snapshot.ticketId, signature) == signature) return
-
-        Log.i(
-            TAG,
-            "ProgressStyle route ticket=${snapshot.ticketId} train=${snapshot.trainNumber} " +
-                "points=${pointPositions.size} positions=$pointPositions " +
-                "progress=$progress/$progressMax allStopsWorkaround=$usesAllStopsWorkaround " +
-                "styleProgress=${if (usesAllStopsWorkaround) progressMax else progress}",
-        )
-    }
-
-
     @RequiresApi(36)
     private fun progressSegments(
         progress: Int,
@@ -612,7 +584,6 @@ class TrackingNotificationFactory(private val context: Context) {
         const val EXTRA_TICKET_ID = "ticket_id"
         private const val TRACKING_NOTIFICATION_NAMESPACE = 0x10000000
         private const val ALERT_NOTIFICATION_NAMESPACE = 0x20000000
-        private const val TAG = "TrackingNotification"
         private const val NOTIFICATION_ID_HASH_MASK = 0x0fffffff
         private const val MAX_RELIABLY_RENDERED_NATIVE_POINTS = 4
         private const val PROGRESS_COMPLETED_SEGMENT_ID = 10_000
@@ -626,7 +597,6 @@ class TrackingNotificationFactory(private val context: Context) {
         private val PROGRESS_CURRENT_POSITION_COLOR = Color.rgb(220, 75, 45)
         private val PROGRESS_DESTINATION_COLOR = Color.rgb(0, 80, 170)
         private val PROGRESS_DESTINATION_REACHED_COLOR = Color.rgb(0, 110, 75)
-        private val pointLayoutSignatures = java.util.concurrent.ConcurrentHashMap<String, String>()
 
         fun notificationIdFor(ticketId: String): Int =
             TRACKING_NOTIFICATION_NAMESPACE or (ticketId.hashCode() and NOTIFICATION_ID_HASH_MASK)

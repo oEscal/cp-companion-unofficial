@@ -3,6 +3,7 @@ package pt.cpcompanion.automation
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CancellationException
 import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.model.TicketAutomationState
 
@@ -28,12 +29,14 @@ class TicketAutomationReconcileWorker(
                 retryNeeded = retryNeeded || outcome.shouldRetry
             }
 
-        return runCatching {
+        return try {
             TicketAutomationReconciler.reconcileNow(applicationContext, onlyTicketId)
-        }.fold(
-            onSuccess = { if (retryNeeded) Result.retry() else Result.success() },
-            onFailure = { Result.retry() },
-        )
+            if (retryNeeded) Result.retry() else Result.success()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            Result.retry()
+        }
     }
 
     companion object {

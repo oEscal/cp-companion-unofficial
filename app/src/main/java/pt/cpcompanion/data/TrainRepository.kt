@@ -1,11 +1,14 @@
 package pt.cpcompanion.data
 
 import android.content.Context
+import android.util.AtomicFile
 import java.io.File
 import java.time.LocalDate
 import java.time.Duration
 import java.time.LocalTime
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -26,6 +29,7 @@ class TrainRepository(context: Context, private val api: CpApiClient) {
     private val cacheDir = File(context.filesDir, "catalog-cache").apply { mkdirs() }
     private val stationsFile = File(cacheDir, "stations-v2.json")
     private val trainsFile = File(cacheDir, "trains-v2.json")
+    private val cacheWriteMutex = Mutex()
 
     suspend fun cachedStations(): List<Station> = readList(stationsFile, Station.serializer())
     suspend fun cachedTrains(): List<TrainServiceEntry> = readList(trainsFile, TrainServiceEntry.serializer())
@@ -160,18 +164,24 @@ class TrainRepository(context: Context, private val api: CpApiClient) {
 
 
     private suspend fun <T> readList(file: File, serializer: KSerializer<T>): List<T> = withContext(Dispatchers.IO) {
-        if (!file.exists()) return@withContext emptyList()
-        runCatching { json.decodeFromString(ListSerializer(serializer), file.readText()) }
+        val atomicFile = AtomicFile(file)
+        if (!file.exists() && !File("${file.path}.bak").exists()) return@withContext emptyList()
+        runCatching {
+            atomicFile.openRead().bufferedReader(Charsets.UTF_8).use { reader ->
+                json.decodeFromString(ListSerializer(serializer), reader.readText())
+            }
+        }
             .getOrElse {
                 // Preserve one diagnostic copy, then remove the unreadable active cache so each
                 // startup does not create another timestamped backup of the same bytes.
                 val corrupt = File(file.parentFile, "${file.name}.corrupt-latest")
                 runCatching {
                     if (corrupt.exists()) corrupt.delete()
-                    if (!file.renameTo(corrupt)) {
+                    if (file.exists() && !file.renameTo(corrupt)) {
                         file.copyTo(corrupt, overwrite = true)
                         file.delete()
                     }
+                    File("${file.path}.bak").delete()
                 }
                 emptyList()
             }
@@ -179,11 +189,21 @@ class TrainRepository(context: Context, private val api: CpApiClient) {
 
     private suspend fun <T> writeList(file: File, value: List<T>, serializer: KSerializer<T>) =
         withContext(Dispatchers.IO) {
-            val temporary = File(file.parentFile, "${file.name}.tmp")
-            temporary.writeText(json.encodeToString(ListSerializer(serializer), value))
-            if (!temporary.renameTo(file)) {
-                file.writeText(temporary.readText())
-                temporary.delete()
+            cacheWriteMutex.withLock {
+                val atomicFile = AtomicFile(file)
+                val output = atomicFile.startWrite()
+                try {
+                    output.write(
+                        json.encodeToString(ListSerializer(serializer), value)
+                            .toByteArray(Charsets.UTF_8),
+                    )
+                    output.flush()
+                    // AtomicFile.finishWrite() also syncs before replacing the previous file.
+                    atomicFile.finishWrite(output)
+                } catch (error: Throwable) {
+                    atomicFile.failWrite(output)
+                    throw error
+                }
             }
         }
 

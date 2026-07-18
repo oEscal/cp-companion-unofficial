@@ -229,7 +229,11 @@ private fun TicketCard(
                 Icon(painterResource(R.drawable.ic_ticket), contentDescription = stringResource(R.string.tickets), modifier = Modifier.size(32.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "${ticket.direction.labelPrefix()}${ticket.serviceLabel ?: stringResource(R.string.train)} ${ticket.trainNumber}",
+                        ticket.direction.labelPrefix() + stringResource(
+                            R.string.service_train_number,
+                            ticket.serviceLabel ?: stringResource(R.string.train),
+                            ticket.trainNumber,
+                        ),
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
@@ -244,7 +248,13 @@ private fun TicketCard(
                 }
                 TicketAutomationToggle(ticket, onAutomaticTrackingChanged)
             }
-            Text("${ticket.originName ?: ticket.originStationCode} → ${ticket.destinationName ?: ticket.destinationStationCode}")
+            Text(
+                stringResource(
+                    R.string.route_between,
+                    ticket.originName ?: ticket.originStationCode,
+                    ticket.destinationName ?: ticket.destinationStationCode,
+                ),
+            )
             StatusPill(
                 ticket.automationStatusLabel(),
                 if (warningState) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHighest,

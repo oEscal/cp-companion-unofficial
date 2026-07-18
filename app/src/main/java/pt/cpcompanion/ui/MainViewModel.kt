@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pt.cpcompanion.AppContainer
+import pt.cpcompanion.R
 import pt.cpcompanion.automation.TicketActivationLauncher
 import pt.cpcompanion.automation.TicketActivationScheduler
 import pt.cpcompanion.automation.TicketAutomationReconciler
@@ -55,6 +56,14 @@ import pt.cpcompanion.tracking.TrainTrackingService
 import pt.cpcompanion.worker.SmsInboxSyncScheduler
 import pt.cpcompanion.worker.TicketReminderScheduler
 import pt.cpcompanion.domain.StationTimeZoneResolver
+
+private suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<T> = try {
+    Result.success(block())
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (error: Throwable) {
+    Result.failure(error)
+}
 
 sealed interface AppScreen {
     data object Home : AppScreen
@@ -167,7 +176,7 @@ class MainViewModel(
             if (stations.isEmpty() || trains.isEmpty() || container.repository.catalogCacheIsStale()) {
                 refreshCatalogs()
             } else {
-                runCatching { container.api.warmUpConfiguration() }
+                runCatchingCancellable { container.api.warmUpConfiguration() }
             }
         }
         viewModelScope.launch {
@@ -326,7 +335,7 @@ class MainViewModel(
             container.stores.awaitReady()
             val ticket = container.stores.ticket(ticketId)
             if (ticket == null) {
-                _state.value = _state.value.copy(message = "The selected ticket is no longer available")
+                _state.value = _state.value.copy(message = string(R.string.selected_ticket_unavailable))
                 return@launch
             }
             navigate(AppScreen.TripScreen(ticket.trainNumber, ticket.serviceDate, ticket.id))
@@ -344,7 +353,7 @@ class MainViewModel(
         when (val screen = _state.value.screen) {
             AppScreen.Home -> {
                 refreshAutomationCapabilities()
-                _state.value = _state.value.copy(message = "Automation state reconciled")
+                _state.value = _state.value.copy(message = string(R.string.automation_state_reconciled))
             }
             AppScreen.Search -> refreshCatalogs()
             AppScreen.Tickets -> importSmsTickets(silent = false)
@@ -357,7 +366,7 @@ class MainViewModel(
                         container.api.warmUpConfiguration(forceRefresh = true)
                         refreshAutomationCapabilities()
                         refreshDiagnostics()
-                        _state.value = _state.value.copy(message = "CP configuration and automation state refreshed")
+                        _state.value = _state.value.copy(message = string(R.string.cp_configuration_refreshed))
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Throwable) {
@@ -393,7 +402,7 @@ class MainViewModel(
         }
         SmsInboxSyncScheduler.syncWithSettings(getApplication())
         _state.value = _state.value.copy(
-            message = if (enabled) "Automatic CP SMS inbox import enabled" else "Automatic CP SMS inbox import disabled",
+            message = string(if (enabled) R.string.sms_auto_import_enabled else R.string.sms_auto_import_disabled),
         )
     }
 
@@ -405,7 +414,7 @@ class MainViewModel(
         val stations = _state.value.stations
         smsImportJob = viewModelScope.launch {
             _state.value = _state.value.copy(smsImporting = true)
-            runCatching {
+            runCatchingCancellable {
                 SmsImportCoordinator.scanInbox(
                     context = getApplication(),
                     stations = stations,
@@ -417,7 +426,7 @@ class MainViewModel(
                 }
             }.onFailure { error ->
                 SmsImportCoordinator.recordFailedScan(getApplication())
-                if (!silent) _state.value = _state.value.copy(message = error.message ?: "Could not read CP SMS messages")
+                if (!silent) _state.value = _state.value.copy(message = error.message ?: string(R.string.sms_read_failed))
             }
             _state.value = _state.value.copy(smsImporting = false)
         }
@@ -425,16 +434,16 @@ class MainViewModel(
 
     fun importSmsText(text: String) {
         if (text.isBlank()) {
-            _state.value = _state.value.copy(message = "Paste or share a CP ticket SMS first")
+            _state.value = _state.value.copy(message = string(R.string.paste_or_share_ticket_first))
             return
         }
         val stations = _state.value.stations
         viewModelScope.launch {
             _state.value = _state.value.copy(smsImporting = true)
-            runCatching { withContext(Dispatchers.Default) { container.smsTicketImporter.importSharedText(text, stations) } }
+            runCatchingCancellable { withContext(Dispatchers.Default) { container.smsTicketImporter.importSharedText(text, stations) } }
                 .onSuccess { result -> persistSmsImport(result, silent = false) }
                 .onFailure { error ->
-                    _state.value = _state.value.copy(message = error.message ?: "The shared text could not be imported")
+                    _state.value = _state.value.copy(message = error.message ?: string(R.string.shared_text_import_failed))
                 }
             _state.value = _state.value.copy(smsImporting = false)
         }
@@ -455,19 +464,22 @@ class MainViewModel(
 
     private fun showSmsImportResult(result: SmsImportResult, changedCount: Int, silent: Boolean) {
         if (!silent || result.tickets.isNotEmpty()) {
-            val issueSuffix = if (result.issues.isEmpty()) "" else " ${result.issues.size} leg(s) still need station matching."
+            val issueText = result.issues.size.takeIf { it > 0 }?.let { count ->
+                plural(R.plurals.sms_station_matching_issues, count, count)
+            }
+            val summary = when {
+                result.tickets.isNotEmpty() && changedCount > 0 ->
+                    plural(R.plurals.sms_imported_updated_count, changedCount, changedCount)
+                result.tickets.isNotEmpty() -> string(R.string.sms_ticket_already_imported)
+                result.candidateMessages == 0 -> plural(
+                    R.plurals.sms_checked_no_recognizable_ticket,
+                    result.messagesScanned,
+                    result.messagesScanned,
+                )
+                else -> string(R.string.sms_found_no_ticket_created)
+            }
             _state.value = _state.value.copy(
-                message = when {
-                    result.tickets.isNotEmpty() ->
-                        if (changedCount > 0) {
-                            "Imported or updated $changedCount ticket leg(s); future tickets were scheduled automatically.$issueSuffix"
-                        } else {
-                            "The ticket was already imported and its automatic tracking schedule is unchanged.$issueSuffix"
-                        }
-                    result.candidateMessages == 0 ->
-                        "Checked ${result.messagesScanned} recent SMS message(s), but none contained a recognizable CP ticket."
-                    else -> "CP ticket SMS found, but no ticket could be created.$issueSuffix"
-                },
+                message = listOfNotNull(summary, issueText).joinToString(" "),
             )
         }
     }
@@ -476,10 +488,10 @@ class MainViewModel(
         val result = container.stores.upsertTicket(
             ticket.copy(
                 automationState = TicketAutomationState.NEEDS_VALIDATION,
-                automationMessage = "Validating the passenger segment",
+                automationMessage = string(R.string.validating_passenger_segment),
             ),
         )
-        _state.value = _state.value.copy(message = "Ticket saved; validating automatic tracking")
+        _state.value = _state.value.copy(message = string(R.string.ticket_saved_validating))
         viewModelScope.launch { enrichAndSchedule(result) }
         return result
     }
@@ -489,20 +501,20 @@ class MainViewModel(
         if (isActive) TrainTrackingService.stop(getApplication(), ticketId)
         TicketReminderScheduler.cancel(getApplication(), ticketId)
         container.stores.deleteTicket(ticketId)
-        _state.value = _state.value.copy(message = "Ticket deleted")
+        _state.value = _state.value.copy(message = string(R.string.ticket_deleted))
     }
 
     fun setTicketAutomaticTracking(ticketId: String, enabled: Boolean) {
         val current = container.stores.ticket(ticketId) ?: return
         if (enabled && !current.shouldShowAutomationSwitch()) {
-            _state.value = _state.value.copy(message = "Automatic tracking cannot be enabled for a past departure")
+            _state.value = _state.value.copy(message = string(R.string.past_departure_automation_unavailable))
             return
         }
         val ticket = container.stores.updateTicket(ticketId) {
             it.copy(
                 automaticTrackingEnabled = enabled,
                 automationState = if (enabled) TicketAutomationState.NEEDS_VALIDATION else TicketAutomationState.DISABLED,
-                automationMessage = if (enabled) "Automatic tracking re-enabled" else "Automatic tracking disabled",
+                automationMessage = if (enabled) string(R.string.automatic_tracking_reenabled) else string(R.string.automation_disabled),
                 completedAtEpochMillis = null,
                 validationFailureCount = if (enabled) 0 else it.validationFailureCount,
                 activationEpochMillis = if (enabled) it.activationEpochMillis else null,
@@ -530,7 +542,7 @@ class MainViewModel(
         val originIndex = trip.stops.indexOfFirst { it.station.code == originCode }
         val destinationIndex = trip.stops.indexOfFirst { it.station.code == destinationCode }
         if (originIndex < 0 || destinationIndex < 0 || originIndex >= destinationIndex) {
-            _state.value = _state.value.copy(message = "Choose an origin and a later destination from this train's calling points")
+            _state.value = _state.value.copy(message = string(R.string.choose_valid_passenger_segment))
             return null
         }
         val origin = trip.stops[originIndex]
@@ -555,13 +567,13 @@ class MainViewModel(
         )
         val saved = container.stores.upsertTicket(enriched)
         TicketReminderScheduler.schedule(getApplication(), saved)
-        _state.value = _state.value.copy(message = "Ticket saved; tracking starts automatically one hour before departure")
+        _state.value = _state.value.copy(message = string(R.string.ticket_saved_automatic))
         return saved
     }
 
     fun startTracking(ticket: Ticket) {
         viewModelScope.launch {
-            val resolved = runCatching {
+            val resolved = runCatchingCancellable {
                 withContext(Dispatchers.IO) {
                     var stations = _state.value.stations.ifEmpty { container.repository.cachedStations() }
                     var matched = container.smsTicketImporter.resolveTicketStations(ticket, stations)
@@ -576,19 +588,19 @@ class MainViewModel(
                 return@launch
             }
             if (resolved.originStationCode.isBlank() || resolved.destinationStationCode.isBlank()) {
-                _state.value = _state.value.copy(message = "This ticket's stations could not be matched to CP's current catalogue.")
+                _state.value = _state.value.copy(message = string(R.string.ticket_stations_not_matched))
                 return@launch
             }
             val saved = container.stores.upsertTicket(resolved.copy(automaticTrackingEnabled = true))
             when (TicketActivationLauncher.activate(getApplication(), saved.id, "manual Track now")) {
-                TicketActivationLauncher.Result.STARTED -> _state.value = _state.value.copy(message = "Tracking started early")
-                TicketActivationLauncher.Result.ALREADY_RUNNING -> _state.value = _state.value.copy(message = "This ticket is already being tracked")
+                TicketActivationLauncher.Result.STARTED -> _state.value = _state.value.copy(message = string(R.string.tracking_started_early))
+                TicketActivationLauncher.Result.ALREADY_RUNNING -> _state.value = _state.value.copy(message = string(R.string.ticket_already_tracked))
                 TicketActivationLauncher.Result.BLOCKED_PERMISSION ->
-                    _state.value = _state.value.copy(message = "Enable notification permission to start tracking")
+                    _state.value = _state.value.copy(message = string(R.string.enable_notifications_for_tracking))
                 TicketActivationLauncher.Result.CONFLICT ->
-                    _state.value = _state.value.copy(message = "Another passenger journey is active; this ticket is queued")
+                    _state.value = _state.value.copy(message = string(R.string.journey_queued))
                 TicketActivationLauncher.Result.FAILED ->
-                    _state.value = _state.value.copy(message = "Android blocked tracking startup")
+                    _state.value = _state.value.copy(message = string(R.string.android_blocked_tracking))
             }
         }
     }
@@ -596,12 +608,12 @@ class MainViewModel(
     suspend fun loadTripForTicketForm(trainNumber: String, serviceDate: String): TrainTrip? =
         withContext(Dispatchers.IO) {
             val date = runCatching { LocalDate.parse(serviceDate) }.getOrNull() ?: return@withContext null
-            runCatching { container.repository.trip(trainNumber, date) }.getOrNull()
+            runCatchingCancellable { container.repository.trip(trainNumber, date) }.getOrNull()
         }
 
     fun stopTracking(ticketId: String? = container.stores.activeTicketId.value) {
         TrainTrackingService.stop(getApplication(), ticketId)
-        _state.value = _state.value.copy(message = "Tracking stopped and disabled for this ticket")
+        _state.value = _state.value.copy(message = string(R.string.tracking_stopped_disabled))
     }
 
     private fun loadStation(station: Station, forceRefresh: Boolean = false) {
@@ -755,8 +767,14 @@ class MainViewModel(
     }
 
     private fun showError(error: Throwable) {
-        _state.value = _state.value.copy(message = error.message ?: "Unexpected error")
+        _state.value = _state.value.copy(message = error.message ?: string(R.string.unexpected_error))
     }
+
+    private fun string(resourceId: Int, vararg formatArgs: Any): String =
+        getApplication<Application>().getString(resourceId, *formatArgs)
+
+    private fun plural(resourceId: Int, quantity: Int, vararg formatArgs: Any): String =
+        getApplication<Application>().resources.getQuantityString(resourceId, quantity, *formatArgs)
 
     private fun updateCombinedLoading() {
         val state = _state.value

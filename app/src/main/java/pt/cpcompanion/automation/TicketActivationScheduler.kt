@@ -4,8 +4,8 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
+import androidx.core.net.toUri
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -15,7 +15,6 @@ import pt.cpcompanion.TrainTrackerApplication
 import pt.cpcompanion.model.Ticket
 import pt.cpcompanion.model.TicketActivationMethod
 import pt.cpcompanion.model.TicketAutomationState
-import pt.cpcompanion.model.hasScheduledPassengerSegmentEnded
 import pt.cpcompanion.model.isClearlyPastForAutomation
 import pt.cpcompanion.worker.UpcomingTripReminderWorker
 
@@ -27,11 +26,12 @@ object TicketActivationScheduler {
     fun schedule(context: Context, ticket: Ticket, force: Boolean = false): Ticket? {
         val app = context.applicationContext as TrainTrackerApplication
         val stores = app.container.stores
+        val now = System.currentTimeMillis()
         if (ticket.automationState == TicketAutomationState.COMPLETED && ticket.completedAtEpochMillis != null) {
             cancel(context, ticket.id)
             return ticket
         }
-        if (ticket.hasScheduledPassengerSegmentEnded() || ticket.isClearlyPastForAutomation()) {
+        if (ticket.isClearlyPastForAutomation(nowEpochMillis = now)) {
             cancel(context, ticket.id)
             return stores.updateTicket(ticket.id) {
                 it.copy(
@@ -41,8 +41,8 @@ object TicketActivationScheduler {
                     activationMethod = TicketActivationMethod.NONE,
                     schedulingFingerprint = null,
                     automationMessage = "Passenger segment already completed",
-                    lastAutomationAttemptEpochMillis = System.currentTimeMillis(),
-                    completedAtEpochMillis = it.completedAtEpochMillis ?: System.currentTimeMillis(),
+                    lastAutomationAttemptEpochMillis = now,
+                    completedAtEpochMillis = it.completedAtEpochMillis ?: now,
                 )
             }
         }
@@ -75,8 +75,6 @@ object TicketActivationScheduler {
                 )
             }
         }
-        val now = System.currentTimeMillis()
-
         val activationAt = departure - LEAD_TIME_MS
         val fingerprint = fingerprint(ticket, activationAt)
         val unchangedAndPresent = ticket.automationState in setOf(
@@ -167,7 +165,7 @@ object TicketActivationScheduler {
             method = method,
             fingerprint = fingerprint,
             message = message,
-            attemptedAtEpochMillis = null,
+            clearAttemptedAtEpochMillis = true,
         )
     }
 
@@ -189,7 +187,7 @@ object TicketActivationScheduler {
             requestCode(ticketId),
             Intent(context, TicketActivationReceiver::class.java)
                 .setAction(TicketActivationReceiver.ACTION_ACTIVATE)
-                .setData(Uri.parse("cpcompanion://activation/$ticketId"))
+                .setData("cpcompanion://activation/$ticketId".toUri())
                 .putExtra(TicketActivationReceiver.EXTRA_TICKET_ID, ticketId),
             existenceFlag or PendingIntent.FLAG_IMMUTABLE,
         )
