@@ -65,6 +65,7 @@ class TripStateResolverTest {
 
         assertEquals(PassengerPhase.ON_BOARD, snapshot.phase)
         assertEquals("Figueira da Foz", snapshot.destinationName)
+        assertEquals("7", snapshot.platform)
         assertEquals(
             date.atTime(21, 8).atZone(ZoneId.of("Europe/Lisbon")).toInstant().toEpochMilli(),
             snapshot.expectedEventEpochMillis,
