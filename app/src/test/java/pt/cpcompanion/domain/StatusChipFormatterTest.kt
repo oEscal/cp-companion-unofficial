@@ -28,6 +28,28 @@ class StatusChipFormatterTest {
     }
 
     @Test
+    fun boardingSoon_doesNotDropSeatWhenCarriageUsesTwoDigits() {
+        assertEquals(
+            "10·32A",
+            StatusChipFormatter.format(
+                snapshot(PassengerPhase.BOARDING_SOON, 4, carriage = "10", seat = "32A"),
+                now,
+            ),
+        )
+    }
+
+    @Test
+    fun boardingSoon_doesNotDropSeatWhenBothValuesNeedTheCompactFallback() {
+        assertEquals(
+            "24·107",
+            StatusChipFormatter.format(
+                snapshot(PassengerPhase.BOARDING_SOON, 4, carriage = "24", seat = "107"),
+                now,
+            ),
+        )
+    }
+
+    @Test
     fun onBoardBeforeEffectiveDeparture_keepsCarriageAndSeatVisible() {
         val effectiveDeparture = now + 2 * 60_000L
 
