@@ -65,6 +65,18 @@ object StatusChipFormatter {
         val combined = listOfNotNull(first, second).joinToString("·")
         return when {
             combined.isNotBlank() && combined.length <= MAX_CRITICAL_TEXT -> combined
+            first != null && second != null -> {
+                /*
+                 * Do not fall back to carriage only when the normal token is one
+                 * character too long. Dropping the seat makes the chip ambiguous.
+                 * Removing the display-only carriage prefix keeps the usual two-
+                 * digit carriage plus three-character seat within the compact budget.
+                 * If even that is too long, retain both values and let System UI
+                 * apply its own chip-width handling rather than losing the seat.
+                 */
+                val compactCombined = "${first.removePrefix("C")}·$second"
+                compactCombined.takeIf { it.length <= MAX_CRITICAL_TEXT } ?: combined
+            }
             first != null && first.length <= MAX_CRITICAL_TEXT -> first
             second != null && second.length <= MAX_CRITICAL_TEXT -> second
             else -> null

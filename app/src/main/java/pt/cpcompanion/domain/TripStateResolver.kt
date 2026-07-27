@@ -181,7 +181,9 @@ class TripStateResolver {
             platform = when (phase) {
                 PassengerPhase.PRE_TRIP,
                 PassengerPhase.APPROACHING_ORIGIN,
-                PassengerPhase.BOARDING_SOON -> origin.source.platform
+                PassengerPhase.BOARDING_SOON,
+                // Retain the boarding platform for the immediate "board now" alert.
+                PassengerPhase.ON_BOARD -> origin.source.platform
                 else -> destination.source.platform
             },
             carriage = ticket.carriage,

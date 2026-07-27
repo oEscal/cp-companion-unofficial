@@ -60,16 +60,29 @@ class TrackingNotificationFactory(private val context: Context) {
     }
 
     fun postImportantAlert(snapshot: TrackingSnapshot) {
-        val platform = snapshot.platform?.let { " · ${context.getString(R.string.platform, it)}" }.orEmpty()
-        val carriage = snapshot.carriage?.let { " · ${context.getString(R.string.carriage_value, it)}" }.orEmpty()
-        val seat = snapshot.seat?.let { " · ${context.getString(R.string.seat_value, it)}" }.orEmpty()
+        val platform = snapshot.platform
+            ?.takeIf(String::isNotBlank)
+            ?.let { context.getString(R.string.platform, it) }
+        val carriage = snapshot.carriage
+            ?.takeIf(String::isNotBlank)
+            ?.let { context.getString(R.string.carriage_value, it) }
+        val seat = snapshot.seat
+            ?.takeIf(String::isNotBlank)
+            ?.let { context.getString(R.string.seat_value, it) }
+        val boardingDetails = listOfNotNull(platform, carriage, seat).joinToString(" · ")
         val (title, text) = when (snapshot.phase) {
             PassengerPhase.BOARDING_SOON ->
                 context.getString(R.string.alert_train_almost_at, snapshot.trainNumber, snapshot.originName) to
-                    "${context.getString(R.string.alert_boarding_shortly)}$platform"
+                    listOfNotNull(
+                        context.getString(R.string.alert_boarding_shortly),
+                        boardingDetails.takeIf(String::isNotBlank),
+                    ).joinToString(" · ")
             PassengerPhase.ON_BOARD ->
                 context.getString(R.string.alert_train_reached_origin, snapshot.trainNumber, snapshot.originName) to
-                    "${context.getString(R.string.alert_board_now)}$carriage$seat"
+                    listOfNotNull(
+                        context.getString(R.string.alert_board_now),
+                        boardingDetails.takeIf(String::isNotBlank),
+                    ).joinToString(" · ")
             PassengerPhase.APPROACHING_DESTINATION ->
                 context.getString(R.string.alert_approaching_destination, snapshot.destinationName) to
                     context.getString(R.string.alert_arrives_soon, snapshot.trainNumber)
@@ -114,6 +127,8 @@ class TrackingNotificationFactory(private val context: Context) {
     private fun buildFallback(snapshot: TrackingSnapshot): Notification {
         val content = content(snapshot)
         val terminal = snapshot.phase.isTerminal()
+        val eventEpochMillis = snapshot.expectedEventEpochMillis
+            ?: snapshot.scheduledEventEpochMillis
         return NotificationCompat.Builder(context, CHANNEL_TRACKING)
             .setSmallIcon(iconFor(snapshot.phase))
             .setContentTitle(content.title)
@@ -127,8 +142,8 @@ class TrackingNotificationFactory(private val context: Context) {
             .setAutoCancel(terminal)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setWhen(snapshot.expectedEventEpochMillis ?: snapshot.lastSuccessfulFetchEpochMillis)
-            .setShowWhen(snapshot.expectedEventEpochMillis != null)
+            .setWhen(eventEpochMillis ?: snapshot.lastSuccessfulFetchEpochMillis)
+            .setShowWhen(eventEpochMillis != null)
             .apply {
                 if (!terminal) {
                     setDeleteIntent(stopIntent(snapshot.ticketId))
@@ -240,16 +255,18 @@ class TrackingNotificationFactory(private val context: Context) {
                 val shortCriticalText = StatusChipFormatter.format(snapshot)
                 if (shortCriticalText != null) {
                     // Prefer the app-defined chip value and avoid giving System UI
-                    // two competing status-chip representations.
+                    // two competing status-chip representations. The notification
+                    // itself still keeps its event timestamp visible below.
                     setShortCriticalText(shortCriticalText)
-                    setShowWhen(false)
+                }
+
+                val eventEpochMillis = snapshot.expectedEventEpochMillis
+                    ?: snapshot.scheduledEventEpochMillis
+                if (eventEpochMillis != null && eventEpochMillis > System.currentTimeMillis()) {
+                    setWhen(eventEpochMillis)
+                    setShowWhen(true)
                 } else {
-                    snapshot.expectedEventEpochMillis
-                        ?.takeIf { it >= System.currentTimeMillis() + 2 * 60_000L }
-                        ?.let {
-                            setWhen(it)
-                            setShowWhen(true)
-                        }
+                    setShowWhen(false)
                 }
             }
             .build()
@@ -360,6 +377,7 @@ class TrackingNotificationFactory(private val context: Context) {
             snapshot.carriage?.takeIf(String::isNotBlank)?.let { context.getString(R.string.carriage_value, it) },
             snapshot.seat?.takeIf(String::isNotBlank)?.let { context.getString(R.string.seat_value, it) },
         ).joinToString(" · ")
+        val boardingPlatform = platform.takeIf { snapshot.phase == PassengerPhase.ON_BOARD }
         val expectedOrScheduled = expected ?: scheduled ?: calculating
 
         return when (snapshot.phase) {
@@ -382,7 +400,12 @@ class TrackingNotificationFactory(private val context: Context) {
                     snapshot.trainNumber,
                     snapshot.originName,
                 ),
-                text = "$expectedLabel $expectedOrScheduled · $delay$staleSuffix",
+                text = listOfNotNull(
+                    "$expectedLabel $expectedOrScheduled$staleSuffix",
+                    delay,
+                    platform,
+                    boarding.takeIf(String::isNotBlank),
+                ).joinToString(" · "),
                 subtext = platform,
                 expanded = buildString {
                     append(snapshot.originName).append(" → ").append(snapshot.destinationName).append('\n')
@@ -390,6 +413,7 @@ class TrackingNotificationFactory(private val context: Context) {
                     scheduled?.let { append(" · ").append(context.getString(R.string.scheduled_inline, it)) }
                     append('\n').append(delay)
                     platform?.let { append(" · ").append(it) }
+                    boarding.takeIf(String::isNotBlank)?.let { append('\n').append(it) }
                     snapshot.message?.takeIf { snapshot.dataStale }?.let { append('\n').append(it) }
                 },
             )
@@ -402,6 +426,7 @@ class TrackingNotificationFactory(private val context: Context) {
                 text = listOfNotNull(
                     "$expectedLabel $expectedOrScheduled$staleSuffix",
                     delay,
+                    boardingPlatform,
                     boarding.takeIf(String::isNotBlank),
                 ).joinToString(" · "),
                 subtext = snapshot.nextStopName?.let { context.getString(R.string.next_stop, it) },
@@ -410,6 +435,7 @@ class TrackingNotificationFactory(private val context: Context) {
                     append(context.getString(R.string.expected_line, expected ?: calculating))
                     scheduled?.let { append(" · ").append(context.getString(R.string.scheduled_inline, it)) }
                     append('\n').append(delay)
+                    boardingPlatform?.let { append(" · ").append(it) }
                     boarding.takeIf(String::isNotBlank)?.let { append('\n').append(it) }
                     snapshot.nextStopName?.let { append('\n').append(context.getString(R.string.next_stop_line, it)) }
                     snapshot.message?.takeIf { snapshot.dataStale }?.let { append('\n').append(it) }
