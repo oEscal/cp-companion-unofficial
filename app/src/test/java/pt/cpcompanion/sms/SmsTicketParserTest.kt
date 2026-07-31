@@ -54,6 +54,17 @@ class SmsTicketParserTest {
     }
 
     @Test
+    fun stripsCarriageAndSeatPrefixLetters() {
+        val result = parser.parse(
+            "Bilhete 0002-23456789 Ida 12/07/2026 Comboio IC 721 " +
+                "Coimbra-B 11:35 > Aveiro 12:02 Car:C24 Lug:L107",
+        )!!
+
+        assertEquals("24", result.legs.single().carriage)
+        assertEquals("107", result.legs.single().seat)
+    }
+
+    @Test
     fun parsesDashDateArrowVariant() {
         val result = parser.parse(
             "Ida: 12-07-2026 - Comboio IC 721 - Coimbra-B - 11h35 → Aveiro - 12h02; " +

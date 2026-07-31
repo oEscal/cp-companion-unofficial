@@ -98,12 +98,17 @@ class TripStateResolver {
             } == true
         val passengerHasDeparted = currentIndex >= originIndex ||
             originBoardingExpected?.let { !now.isBefore(it.toInstant()) } == true
+        val boardingSoon = originEventExpected != null &&
+            durationToOrigin != null &&
+            durationToOrigin <= Duration.ofMinutes(5) &&
+            // Keep the boarding phase after ETA until the train's departure is due.
+            (!durationToOrigin.isNegative ||
+                originBoardingExpected?.let { now.isBefore(it.toInstant()) } == true)
 
         val phase = when {
             cancelled -> PassengerPhase.CANCELLED
             statusArrived || destinationPassed || reliableExpectedArrivalPassed -> PassengerPhase.ARRIVED
-            originEventExpected != null && durationToOrigin != null && !durationToOrigin.isNegative &&
-                durationToOrigin <= Duration.ofMinutes(5) -> PassengerPhase.BOARDING_SOON
+            boardingSoon -> PassengerPhase.BOARDING_SOON
             originEventExpected != null && durationToOrigin != null && durationToOrigin > Duration.ofMinutes(60) ->
                 PassengerPhase.PRE_TRIP
             originEventExpected != null && now.isBefore(originEventExpected.toInstant()) ->
