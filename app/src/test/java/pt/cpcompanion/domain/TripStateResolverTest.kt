@@ -58,6 +58,29 @@ class TripStateResolverTest {
     }
 
     @Test
+    fun arrivalJustPassedBeforeDeparture_staysBoardingSoonAndKeepsSeatChip() {
+        val date = LocalDate.of(2026, 7, 11)
+        val ticket = ticket(date).copy(
+            originStationCode = "94-35170",
+            originName = "Bencanta",
+        )
+        val delayedDepartureTrip = trip(date).copy(
+            stops = trip(date).stops.map { stop ->
+                if (stop.station.code == "94-35170") {
+                    stop.copy(expectedDeparture = "20:15")
+                } else {
+                    stop
+                }
+            },
+        )
+        val now = date.atTime(20, 13, 30).atZone(ZoneId.of("Europe/Lisbon")).toInstant()
+        val snapshot = resolver.resolve(ticket, delayedDepartureTrip, now)
+
+        assertEquals(PassengerPhase.BOARDING_SOON, snapshot.phase)
+        assertEquals("C4·32A", StatusChipFormatter.format(snapshot, now.toEpochMilli()))
+    }
+
+    @Test
     fun afterOriginBeforeDestination_entersOnBoard() {
         val date = LocalDate.of(2026, 7, 11)
         val now = date.atTime(20, 20).atZone(ZoneId.of("Europe/Lisbon")).toInstant()
