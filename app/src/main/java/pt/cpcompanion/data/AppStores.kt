@@ -28,6 +28,8 @@ import pt.cpcompanion.model.TicketAutomationState
 import pt.cpcompanion.model.TrackingSnapshot
 import pt.cpcompanion.model.isClearlyPastForAutomation
 import pt.cpcompanion.model.isClearlyPastByTimeOnly
+import pt.cpcompanion.model.normalizeCarriage
+import pt.cpcompanion.model.normalizeSeat
 
 /** Result of merging an SMS/notification ticket into stable persisted ticket data. */
 data class ImportedTicketUpsertResult(
@@ -488,6 +490,8 @@ class AppStores(context: Context) {
             expectedDepartureEpochMillis = null,
             expectedArrivalEpochMillis = null,
             liveDelayMinutes = null,
+            carriage = normalizeCarriage(ticket.carriage),
+            seat = normalizeSeat(ticket.seat),
         )
         val legacyManualOptOut = !withoutVolatileFields.automaticTrackingEnabled &&
             withoutVolatileFields.automationState == TicketAutomationState.COMPLETED &&

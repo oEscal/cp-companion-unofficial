@@ -6,6 +6,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.UUID
+import pt.cpcompanion.model.normalizeCarriage
+import pt.cpcompanion.model.normalizeSeat
 
 enum class SmsJourneyDirection {
     OUTBOUND,
@@ -173,8 +175,8 @@ class SmsTicketParser {
                 TRAIN.find(segment)
             }
             val trainNumber = trainMatch?.groups?.get(2)?.value.orEmpty()
-            val carriage = CARRIAGE.find(segment)?.groups?.get(1)?.value?.ifBlank { null }
-            val seat = SEAT.find(segment)?.groups?.get(1)?.value?.ifBlank { null }
+            val carriage = normalizeCarriage(CARRIAGE.find(segment)?.groups?.get(1)?.value)
+            val seat = normalizeSeat(SEAT.find(segment)?.groups?.get(1)?.value)
             if (trainNumber.isNotBlank() && (carriage != null || seat != null)) {
                 result[AssignmentKey(directionMatch.value.toDirection(), trainNumber)] =
                     SeatAssignment(carriage, seat)
@@ -186,8 +188,8 @@ class SmsTicketParser {
         if (result.isEmpty()) {
             GENERIC_ASSIGNMENT.findAll(section).forEach { match ->
                 val trainNumber = match.groups[2]?.value.orEmpty()
-                val carriage = match.groups[3]?.value?.ifBlank { null }
-                val seat = match.groups[4]?.value?.ifBlank { null }
+                val carriage = normalizeCarriage(match.groups[3]?.value)
+                val seat = normalizeSeat(match.groups[4]?.value)
                 if (trainNumber.isNotBlank() && (carriage != null || seat != null)) {
                     result[AssignmentKey(null, trainNumber)] = SeatAssignment(carriage, seat)
                 }
@@ -197,8 +199,8 @@ class SmsTicketParser {
         // Last fallback for a message that contains one train and one global
         // carriage/seat assignment.
         if (result.isEmpty()) {
-            val carriage = CARRIAGE.find(section)?.groups?.get(1)?.value
-            val seat = SEAT.find(section)?.groups?.get(1)?.value
+            val carriage = normalizeCarriage(CARRIAGE.find(section)?.groups?.get(1)?.value)
+            val seat = normalizeSeat(SEAT.find(section)?.groups?.get(1)?.value)
             val trainNumber = TRAIN.find(section)?.groups?.get(2)?.value
             if (trainNumber != null && (carriage != null || seat != null)) {
                 result[AssignmentKey(null, trainNumber)] = SeatAssignment(carriage, seat)
