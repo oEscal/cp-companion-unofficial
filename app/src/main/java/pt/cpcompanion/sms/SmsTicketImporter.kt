@@ -98,15 +98,23 @@ class SmsTicketImporter(
     }
 
     fun importSharedText(text: String, stations: List<Station>): SmsImportResult =
-        importText(text, stations, TicketSource.SHARED_SMS, stableId(text))
+        importText(
+            text = text,
+            sender = CP_SENDER,
+            stations = stations,
+            source = TicketSource.SHARED_SMS,
+            sourceId = stableId(text),
+        )
 
     fun importNotificationText(
         text: String,
+        sender: String,
         stations: List<Station>,
         notificationKey: String,
         receivedAtEpochMillis: Long = System.currentTimeMillis(),
     ): SmsImportResult = importText(
         text = text,
+        sender = sender,
         stations = stations,
         source = TicketSource.SMS_NOTIFICATION,
         sourceId = notificationKey,
@@ -115,6 +123,7 @@ class SmsTicketImporter(
 
     private fun importText(
         text: String,
+        sender: String,
         stations: List<Station>,
         source: TicketSource,
         sourceId: String,
@@ -123,7 +132,7 @@ class SmsTicketImporter(
         messages = listOf(
             SmsSourceMessage(
                 id = sourceId,
-                sender = CP_SENDER,
+                sender = sender,
                 body = text,
                 receivedAtEpochMillis = receivedAtEpochMillis,
                 source = source,

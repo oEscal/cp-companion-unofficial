@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
       - name: Install Android SDK
         run: sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0"
       - name: Test, lint, and build
@@ -27,7 +27,7 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
           test -f app/build/outputs/apk/release/app-release-unsigned.apk || test -f app/build/outputs/apk/release/app-release.apk
           find app/build/outputs/apk -type f -name '*.apk' -print0 | sort -z | xargs -0 sha256sum > app/build/outputs/apk/SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cp-companion-apks
           path: |
