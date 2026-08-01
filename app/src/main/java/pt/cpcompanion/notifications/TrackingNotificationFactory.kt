@@ -141,7 +141,7 @@ class TrackingNotificationFactory(private val context: Context) {
             .setOngoing(!terminal)
             .setAutoCancel(terminal)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setWhen(eventEpochMillis ?: snapshot.lastSuccessfulFetchEpochMillis)
             .setShowWhen(eventEpochMillis != null)
             .apply {
@@ -238,7 +238,7 @@ class TrackingNotificationFactory(private val context: Context) {
             .setOnlyAlertOnce(true)
             .setOngoing(!snapshot.phase.isTerminal())
             .setCategory(Notification.CATEGORY_NAVIGATION)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setColorized(false)
             .addExtras(extras)
             .apply {
