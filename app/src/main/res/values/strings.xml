@@ -41,6 +41,8 @@
     <string name="read_cp_ticket_sms_disclosure">The app reads local SMS messages only to identify CP ticket messages and create passenger journeys. Message bodies are processed on the device and are not uploaded.</string>
     <string name="paste_cp_ticket_sms">Paste CP ticket SMS</string>
     <string name="paste_cp_ticket_sms_body">Paste the complete message, including the outbound or return journey and ticket section.</string>
+    <string name="confirm_shared_ticket_import">Import shared ticket?</string>
+    <string name="confirm_shared_ticket_import_body">Only import this message if you intentionally shared a CP ticket. Valid future journeys enable automatic tracking.</string>
     <string name="sms_text">SMS text</string>
     <string name="add_future_ticket">Add future ticket</string>
     <string name="origin_station_code">Origin station code</string>
@@ -91,7 +93,7 @@
     <string name="refresh_counters">Refresh counters</string>
     <string name="automatic_cp_sms_detection">Automatic CP SMS detection</string>
     <string name="open_settings">Open settings</string>
-    <string name="automatic_cp_sms_detection_body">Notification access lets the app detect new CP ticket messages without reading the complete SMS inbox. Ticket text is processed locally.</string>
+    <string name="automatic_cp_sms_detection_body">Notification access lets the app detect CP ticket messages posted by your default SMS app without reading the complete inbox. Ticket text is processed locally.</string>
     <string name="train_icon_description">Train</string>
     <string name="favorite_station_description">Favorite station</string>
     <string name="unfavorite_station_description">Remove favorite station</string>
@@ -139,7 +141,7 @@
     <string name="notification_permission_missing">Notification permission or the tracking channel is disabled.</string>
     <string name="automatic_cp_access_body">The app discovers the current public CP runtime configuration automatically. No private API key is stored.</string>
     <string name="automatic_inbox_import_body">Periodically check the SMS inbox for new CP ticket messages. This remains off until explicitly enabled.</string>
-    <string name="detect_cp_sms_notifications_body">Use notification access to detect new CP ticket messages without periodically scanning the inbox.</string>
+    <string name="detect_cp_sms_notifications_body">Use notification access to detect CP ticket messages posted by your default SMS app without periodically scanning the inbox.</string>
     <string name="diagnostics_body">Request counts are aggregated by endpoint family and do not contain passenger or ticket data.</string>
     <string name="inbox_disclosure_detailed">The first check reads a bounded recent window. Later checks use a received-time and message-ID cursor. Only CP-ticket candidates are retained and parsed locally; SMS content is not uploaded.</string>
     <string name="appearance_body">Choose whether CP Companion follows the device appearance or always uses a light or dark palette.</string>
@@ -148,14 +150,14 @@
     <string name="notification_tracking_requirement">Automatic sessions require an ongoing notification. If permission or the tracking channel is blocked, affected tickets remain in a recoverable blocked state.</string>
     <string name="automatic_cp_access_detailed">CP Companion discovers the current public CP service configuration automatically, validates CP-owned hosts, caches catalogues, and coordinates duplicate requests across the UI and tracking service.</string>
     <string name="automatic_inbox_import_detailed">When enabled, the app checks incrementally for new CP ticket messages. Disabling this switch cancels periodic inbox work.</string>
-    <string name="notification_detection_enabled">Enabled. Strong CP ticket markers are parsed locally and duplicate notification content is ignored.</string>
-    <string name="notification_detection_optional">Optional. Notification access can import new CP ticket messages without inbox permission.</string>
+    <string name="notification_detection_enabled">Enabled. Only notifications from your default SMS app are considered; strong CP ticket markers are parsed locally and duplicates are ignored.</string>
+    <string name="notification_detection_optional">Optional. Notification access can import CP ticket messages from your default SMS app without inbox permission.</string>
     <string name="manage_access">Manage access</string>
     <string name="enable_detection">Enable detection</string>
     <string name="live_tracking_behavior">Live tracking behavior</string>
     <string name="live_tracking_behavior_body">A standard silent ongoing notification starts at T-60. Live Update promotion is requested only when departure is imminent or the journey is active. Polling adapts between roughly 10 and 60 seconds and backs off globally after rate limiting.</string>
     <string name="no_request_counters">No request counters loaded.</string>
-    <string name="notification_access_disclosure">Android notification access can expose notifications from all apps. CP Companion filters message-like notifications, processes strong CP-ticket markers locally, does not upload notification content, and lets you revoke access at any time.</string>
+    <string name="notification_access_disclosure">Android notification access can expose notifications from all apps. CP Companion accepts ticket candidates only from your default SMS app, processes them locally, does not upload notification content, and lets you revoke access at any time.</string>
     <plurals name="minutes_remaining">
         <item quantity="one">%d min</item>
         <item quantity="many">%d min</item>

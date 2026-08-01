@@ -41,6 +41,8 @@
     <string name="read_cp_ticket_sms_disclosure">A aplicação lê mensagens SMS locais apenas para identificar bilhetes da CP e criar viagens. O conteúdo é processado no dispositivo e não é enviado.</string>
     <string name="paste_cp_ticket_sms">Colar SMS de bilhete da CP</string>
     <string name="paste_cp_ticket_sms_body">Cole a mensagem completa, incluindo o trajeto de ida ou volta e a secção do bilhete.</string>
+    <string name="confirm_shared_ticket_import">Importar bilhete partilhado?</string>
+    <string name="confirm_shared_ticket_import_body">Importe esta mensagem apenas se partilhou intencionalmente um bilhete da CP. As viagens futuras válidas ativam o acompanhamento automático.</string>
     <string name="sms_text">Texto do SMS</string>
     <string name="add_future_ticket">Adicionar bilhete futuro</string>
     <string name="origin_station_code">Código da estação de origem</string>
@@ -91,7 +93,7 @@
     <string name="refresh_counters">Atualizar contadores</string>
     <string name="automatic_cp_sms_detection">Deteção automática de SMS da CP</string>
     <string name="open_settings">Abrir definições</string>
-    <string name="automatic_cp_sms_detection_body">O acesso às notificações permite detetar novas mensagens de bilhetes da CP sem ler toda a caixa de SMS. O texto é processado localmente.</string>
+    <string name="automatic_cp_sms_detection_body">O acesso às notificações permite detetar mensagens de bilhetes da CP publicadas pela aplicação de SMS predefinida sem ler toda a caixa. O texto é processado localmente.</string>
     <string name="train_icon_description">Comboio</string>
     <string name="favorite_station_description">Adicionar estação aos favoritos</string>
     <string name="unfavorite_station_description">Remover estação dos favoritos</string>
@@ -139,7 +141,7 @@
     <string name="notification_permission_missing">A permissão de notificações ou o canal de acompanhamento está desativado.</string>
     <string name="automatic_cp_access_body">A aplicação descobre automaticamente a configuração pública atual da CP. Não é guardada qualquer chave de API privada.</string>
     <string name="automatic_inbox_import_body">Verificar periodicamente a caixa de SMS à procura de novos bilhetes da CP. Esta opção permanece desativada até ser ativada explicitamente.</string>
-    <string name="detect_cp_sms_notifications_body">Usar o acesso às notificações para detetar novos bilhetes da CP sem verificar periodicamente toda a caixa de SMS.</string>
+    <string name="detect_cp_sms_notifications_body">Usar o acesso às notificações para detetar bilhetes da CP publicados pela aplicação de SMS predefinida sem verificar periodicamente toda a caixa.</string>
     <string name="diagnostics_body">Os pedidos são contabilizados por família de endpoint e não incluem dados de passageiros ou bilhetes.</string>
     <string name="inbox_disclosure_detailed">A primeira verificação lê uma janela recente limitada. As verificações seguintes usam um cursor de data de receção e identificador da mensagem. Apenas candidatos a bilhetes da CP são retidos e analisados localmente; o conteúdo dos SMS não é enviado.</string>
     <string name="appearance_body">Escolha se o CP Companion segue a aparência do dispositivo ou utiliza sempre um tema claro ou escuro.</string>
@@ -148,14 +150,14 @@
     <string name="notification_tracking_requirement">As sessões automáticas exigem uma notificação contínua. Se a permissão ou o canal estiver bloqueado, os bilhetes afetados permanecem num estado bloqueado recuperável.</string>
     <string name="automatic_cp_access_detailed">O CP Companion descobre automaticamente a configuração pública atual da CP, valida servidores pertencentes à CP, mantém catálogos em cache e coordena pedidos duplicados entre a interface e o serviço de acompanhamento.</string>
     <string name="automatic_inbox_import_detailed">Quando ativada, a aplicação verifica incrementalmente novas mensagens de bilhetes da CP. Desativar esta opção cancela o trabalho periódico da caixa de SMS.</string>
-    <string name="notification_detection_enabled">Ativada. Marcadores fortes de bilhetes da CP são analisados localmente e conteúdo de notificações duplicado é ignorado.</string>
-    <string name="notification_detection_optional">Opcional. O acesso às notificações pode importar novas mensagens de bilhetes da CP sem permissão para ler a caixa de SMS.</string>
+    <string name="notification_detection_enabled">Ativada. Apenas são consideradas notificações da aplicação de SMS predefinida; os marcadores fortes de bilhetes da CP são analisados localmente e os duplicados são ignorados.</string>
+    <string name="notification_detection_optional">Opcional. O acesso às notificações pode importar mensagens de bilhetes da CP da aplicação de SMS predefinida sem permissão para ler a caixa de SMS.</string>
     <string name="manage_access">Gerir acesso</string>
     <string name="enable_detection">Ativar deteção</string>
     <string name="live_tracking_behavior">Comportamento do acompanhamento em direto</string>
     <string name="live_tracking_behavior_body">Uma notificação contínua silenciosa começa em T-60. A promoção para atualização em direto só é pedida quando a partida está próxima ou a viagem está ativa. A frequência varia aproximadamente entre 10 e 60 segundos e recua globalmente após limitação de pedidos.</string>
     <string name="no_request_counters">Nenhum contador de pedidos carregado.</string>
-    <string name="notification_access_disclosure">O acesso às notificações do Android pode expor notificações de todas as aplicações. O CP Companion filtra notificações semelhantes a mensagens, processa localmente marcadores fortes de bilhetes da CP, não envia o conteúdo das notificações e permite revogar o acesso em qualquer momento.</string>
+    <string name="notification_access_disclosure">O acesso às notificações do Android pode expor notificações de todas as aplicações. O CP Companion aceita candidatos a bilhetes apenas da aplicação de SMS predefinida, processa-os localmente, não envia o conteúdo e permite revogar o acesso em qualquer momento.</string>
     <plurals name="minutes_remaining">
         <item quantity="one">%d min</item>
         <item quantity="many">%d min</item>

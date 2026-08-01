@@ -8,15 +8,18 @@
 - Verified application ID, compile/target SDK, backup policy, cleartext policy, and Material 3 Expressive dependency invariants.
 - Checked shell syntax for `build.sh` and `gradlew`.
 - Checked Git whitespace/error conditions with `git diff --check`.
-- Reviewed exported components and validated external activity and receiver inputs.
+- Verified every file listed in `docs/SOURCE_SHA256SUMS.txt` against its SHA-256 digest.
+- Reviewed exported components, required confirmation for shared ticket imports, and restricted notification imports to the default SMS app.
 - Reviewed suspend failure paths and corrected cancellation swallowing in workers, ticket validation, imports, and UI requests.
 - Reviewed CP URL construction, runtime configuration validation, global 429 coordination, persistence writes, and encrypted-value recovery.
+- Verified private tracking-notification visibility, Gradle bootstrap checksum enforcement, and immutable CI action revisions.
 - Verified no legacy Compose Material imports are used; all UI is under the Material 3 Expressive theme.
 - Verified the final archive excludes generated build products, local SDK configuration, captures, and signing material.
 
 Run the source-only checks directly with:
 
 ```bash
+python3 tools/update_source_checksums.py
 python3 tools/validate_source.py
 ```
 

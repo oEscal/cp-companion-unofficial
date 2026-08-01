@@ -10,6 +10,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.provider.Telephony
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
@@ -43,6 +44,11 @@ class CpSmsNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
+        if (!isTrustedSmsNotificationPackage(
+                packageName = sbn.packageName,
+                defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this),
+            )
+        ) return
         val notification = sbn.notification
         if (notification.category != null && notification.category != Notification.CATEGORY_MESSAGE) return
         val body = extractBody(notification) ?: return
@@ -61,6 +67,7 @@ class CpSmsNotificationListener : NotificationListenerService() {
             try {
                 val result = container.smsTicketImporter.importNotificationText(
                     text = body,
+                    sender = sender,
                     stations = container.repository.cachedStations(),
                     notificationKey = sbn.key,
                     receivedAtEpochMillis = sbn.postTime,

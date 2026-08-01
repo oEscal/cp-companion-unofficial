@@ -2,6 +2,7 @@
 """Fast source-only checks that do not require the Android SDK."""
 from __future__ import annotations
 
+import hashlib
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -11,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app"
 RES = APP / "src" / "main" / "res"
 ERRORS: list[str] = []
+SOURCE_CHECKSUMS = ROOT / "docs" / "SOURCE_SHA256SUMS.txt"
 
 
 def error(message: str) -> None:
@@ -93,14 +95,51 @@ def check_resource_references() -> None:
             error(f"Missing resource {resource_type}/{name}, referenced by {path.relative_to(ROOT)}")
 
 
+def check_source_checksums() -> None:
+    if not SOURCE_CHECKSUMS.is_file():
+        error("Missing docs/SOURCE_SHA256SUMS.txt")
+        return
+
+    seen: set[Path] = set()
+    for line_number, raw_line in enumerate(SOURCE_CHECKSUMS.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2 or not re.fullmatch(r"[0-9a-f]{64}", parts[0]):
+            error(f"Invalid source checksum entry at line {line_number}")
+            continue
+        relative_text = parts[1].removeprefix("./")
+        relative = Path(relative_text)
+        if relative.is_absolute() or ".." in relative.parts:
+            error(f"Unsafe source checksum path at line {line_number}: {parts[1]}")
+            continue
+        path = ROOT / relative
+        if path in seen:
+            error(f"Duplicate source checksum path: {relative_text}")
+            continue
+        seen.add(path)
+        if not path.is_file():
+            error(f"Source checksum file is missing: {relative_text}")
+            continue
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual != parts[0]:
+            error(f"Source checksum mismatch: {relative_text}")
+
+
 def check_project_invariants() -> None:
     app_build = (APP / "build.gradle.kts").read_text(encoding="utf-8")
     manifest = (APP / "src" / "main" / "AndroidManifest.xml").read_text(encoding="utf-8")
     network = (RES / "xml" / "network_security_config.xml").read_text(encoding="utf-8")
     versions = (ROOT / "gradle" / "libs.versions.toml").read_text(encoding="utf-8")
     wrapper = (ROOT / "gradle" / "wrapper" / "gradle-wrapper.properties").read_text(encoding="utf-8")
+    build_script = (ROOT / "build.sh").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "android.yml").read_text(encoding="utf-8")
     api_client = (
         APP / "src" / "main" / "java" / "pt" / "cpcompanion" / "network" / "CpApiClient.kt"
+    ).read_text(encoding="utf-8")
+    notification_factory = (
+        APP / "src" / "main" / "java" / "pt" / "cpcompanion" / "notifications" / "TrackingNotificationFactory.kt"
     ).read_text(encoding="utf-8")
 
     required_fragments = {
@@ -116,6 +155,13 @@ def check_project_invariants() -> None:
         "versioned user agent": 'USER_AGENT = "CP-Companion-Android/0.7.0"',
         "Gradle distribution": "gradle-9.4.1-bin.zip",
         "Gradle checksum": "distributionSha256Sum=2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb",
+        "Gradle bootstrap checksum verification": "sha256sum --check --status",
+        "private fallback tracking notification": ".setVisibility(NotificationCompat.VISIBILITY_PRIVATE)",
+        "private progress tracking notification": ".setVisibility(Notification.VISIBILITY_PRIVATE)",
+        "pinned checkout action": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "pinned Java action": "actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9",
+        "pinned Android action": "android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407",
+        "pinned artifact action": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     }
     haystacks = {
         "applicationId": app_build,
@@ -130,6 +176,13 @@ def check_project_invariants() -> None:
         "versioned user agent": api_client,
         "Gradle distribution": wrapper,
         "Gradle checksum": wrapper,
+        "Gradle bootstrap checksum verification": build_script,
+        "private fallback tracking notification": notification_factory,
+        "private progress tracking notification": notification_factory,
+        "pinned checkout action": workflow,
+        "pinned Java action": workflow,
+        "pinned Android action": workflow,
+        "pinned artifact action": workflow,
     }
     for label, fragment in required_fragments.items():
         if fragment not in haystacks[label]:
@@ -138,6 +191,9 @@ def check_project_invariants() -> None:
     for forbidden in (ROOT / "local.properties", ROOT / "app" / "release.keystore"):
         if forbidden.exists():
             error(f"Local or signing material must not be packaged: {forbidden.relative_to(ROOT)}")
+
+    if "VISIBILITY_PUBLIC" in notification_factory:
+        error("Tracking notifications must not expose travel details with VISIBILITY_PUBLIC")
 
     for path in sorted((APP / "src" / "main" / "java").rglob("*.kt")):
         if "androidx.compose.material." in path.read_text(encoding="utf-8"):
@@ -149,6 +205,7 @@ def main() -> int:
     check_translation_parity()
     check_resource_references()
     check_project_invariants()
+    check_source_checksums()
     if ERRORS:
         print("Source validation failed:", file=sys.stderr)
         for message in ERRORS:

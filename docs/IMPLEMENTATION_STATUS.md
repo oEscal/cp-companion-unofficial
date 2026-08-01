@@ -7,7 +7,7 @@
 | Station and train search | Searchable station/train catalogues, favorites, train service date selection, and direct trip opening. |
 | Station boards | Arrival/departure selection, arbitrary service date, searchable trips, refresh, midnight date resolution, and finished/upcoming/cancelled visual states. |
 | Trip details | Calling points, passenger segment selection, delay/expected-time state, current/passed/skipped/origin/destination chips, and long-route progress data. |
-| Ticket import | Manual form, shared/pasted CP text, opt-in SMS inbox scan, and optional notification-listener import. |
+| Ticket import | Manual form, pasted CP text, confirmed Android share input, opt-in SMS inbox scan, and default-SMS-app notification detection. |
 | Automatic tracking | Validated future tickets default to T-60 activation with exact/inexact AlarmManager and WorkManager recovery. |
 | Delayed journeys | Scheduled arrival alone does not complete automation; recent journeys remain eligible for live verification. |
 | Concurrent tickets | Per-ticket sessions and notifications can run concurrently; duplicate launch paths for one ticket are rejected. |
@@ -16,7 +16,7 @@
 | Networking | Runtime CP configuration discovery, HTTPS/host/path validation, request coalescing, token-bucket pacing, bounded caches, global 429 cooldown, and stale-data fallback. |
 | Navigation/UI | Navigation Compose, predictive back, edge-to-edge layout, Material 3 Expressive theme, dynamic color, and System/Light/Dark modes. |
 | Localization/accessibility | English and Portuguese resources and semantic labels for modified interactive controls. |
-| Privacy | Local SMS/notification parsing, backup exclusion, cleartext denial, bounded external input, and no logging of passenger/ticket/runtime-header data. |
+| Privacy | Local SMS/notification parsing, confirmed external share input, default-SMS-app notification trust, private lock-screen notifications, backup exclusion, cleartext denial, and no sensitive logging. |
 
 ## Preserved reliability behavior
 

@@ -5,13 +5,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.UUID
 import pt.cpcompanion.notifications.TrackingNotificationFactory
+import pt.cpcompanion.ui.AppScreen
 import pt.cpcompanion.ui.MainViewModel
 import pt.cpcompanion.ui.TrainTrackerApp
 
@@ -37,13 +43,33 @@ class MainActivity : ComponentActivity() {
                 }
             }
             LaunchedEffect(sharedText) {
-                sharedText?.let { text ->
-                    viewModel.navigate(pt.cpcompanion.ui.AppScreen.Tickets)
-                    viewModel.importSmsText(text)
-                    sharedSmsText.value = null
+                if (sharedText != null) {
+                    viewModel.navigate(AppScreen.Tickets)
                 }
             }
             TrainTrackerApp(viewModel)
+            sharedText?.let { text ->
+                AlertDialog(
+                    onDismissRequest = { sharedSmsText.value = null },
+                    title = { Text(stringResource(R.string.confirm_shared_ticket_import)) },
+                    text = { Text(stringResource(R.string.confirm_shared_ticket_import_body)) },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                sharedSmsText.value = null
+                                viewModel.importSmsText(text)
+                            },
+                        ) {
+                            Text(stringResource(R.string.import_action))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { sharedSmsText.value = null }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    },
+                )
+            }
         }
     }
 

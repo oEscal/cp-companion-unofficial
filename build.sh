@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETTINGS="$ROOT/settings.gradle.kts"
 APP_DIR="$ROOT/app"
-GRADLE_VERSION="9.6.1"
+WRAPPER_PROPERTIES="$ROOT/gradle/wrapper/gradle-wrapper.properties"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -13,8 +13,33 @@ fail() {
 
 [[ -f "$SETTINGS" ]] || fail "Missing $SETTINGS"
 [[ -f "$APP_DIR/build.gradle.kts" ]] || fail "Android module not found at $APP_DIR"
-grep -Eq 'include\(("|\x27):app("|\x27)\)|include[[:space:]]+("|\x27):app("|\x27)' "$SETTINGS" \
-  || fail "settings.gradle.kts does not include the :app module"
+[[ -f "$WRAPPER_PROPERTIES" ]] || fail "Missing $WRAPPER_PROPERTIES"
+if ! grep -Fq 'include(":app")' "$SETTINGS" &&
+   ! grep -Fq "include(':app')" "$SETTINGS" &&
+   ! grep -Eq 'include[[:space:]]+":app"' "$SETTINGS" &&
+   ! grep -Eq "include[[:space:]]+':app'" "$SETTINGS"; then
+  fail "settings.gradle.kts does not include the :app module"
+fi
+
+GRADLE_URL="$(sed -n 's/^distributionUrl=//p' "$WRAPPER_PROPERTIES" | sed 's/\\:/:/g')"
+GRADLE_SHA256="$(sed -n 's/^distributionSha256Sum=//p' "$WRAPPER_PROPERTIES")"
+GRADLE_ARCHIVE="$(basename "$GRADLE_URL")"
+case "$GRADLE_URL" in
+  "https://services.gradle.org/distributions/$GRADLE_ARCHIVE") ;;
+  *) fail "Unexpected Gradle distribution URL in $WRAPPER_PROPERTIES" ;;
+esac
+case "$GRADLE_ARCHIVE" in
+  gradle-*-bin.zip) ;;
+  *) fail "Unexpected Gradle distribution archive in $WRAPPER_PROPERTIES" ;;
+esac
+[[ "$GRADLE_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] \
+  || fail "Missing or invalid Gradle SHA-256 checksum in $WRAPPER_PROPERTIES"
+GRADLE_VERSION="${GRADLE_ARCHIVE#gradle-}"
+GRADLE_VERSION="${GRADLE_VERSION%-bin.zip}"
+
+command -v python3 >/dev/null 2>&1 \
+  || fail "python3 is required for source validation"
+python3 "$ROOT/tools/validate_source.py"
 
 if [[ -z "${ANDROID_HOME:-}" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
   export ANDROID_HOME="$ANDROID_SDK_ROOT"
@@ -48,27 +73,32 @@ else
 
   if [[ ! -x "$GRADLE_BIN" ]]; then
     mkdir -p "$CACHE_ROOT"
-    ZIP="$CACHE_ROOT/gradle-$GRADLE_VERSION-bin.zip"
-
-    if [[ ! -f "$ZIP" ]]; then
-      echo "Downloading Gradle $GRADLE_VERSION…" >&2
-      if command -v curl >/dev/null 2>&1; then
-        curl --fail --location --retry 3 --retry-all-errors \
-          --output "$ZIP" \
-          "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip"
-      elif command -v wget >/dev/null 2>&1; then
-        wget --tries=3 --output-document="$ZIP" \
-          "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip"
-      else
-        fail "curl or wget is required to bootstrap Gradle $GRADLE_VERSION"
-      fi
-    fi
+    ZIP="$CACHE_ROOT/$GRADLE_ARCHIVE"
 
     command -v sha256sum >/dev/null 2>&1 \
       || fail "sha256sum is required to verify the Gradle distribution"
 
     command -v unzip >/dev/null 2>&1 \
       || fail "unzip is required to unpack Gradle $GRADLE_VERSION"
+
+    if [[ ! -f "$ZIP" ]]; then
+      echo "Downloading Gradle $GRADLE_VERSION…" >&2
+      if command -v curl >/dev/null 2>&1; then
+        curl --fail --location --retry 3 --retry-all-errors \
+          --output "$ZIP" \
+          "$GRADLE_URL"
+      elif command -v wget >/dev/null 2>&1; then
+        wget --tries=3 --output-document="$ZIP" \
+          "$GRADLE_URL"
+      else
+        fail "curl or wget is required to bootstrap Gradle $GRADLE_VERSION"
+      fi
+    fi
+
+    if ! printf '%s  %s\n' "$GRADLE_SHA256" "$ZIP" | sha256sum --check --status; then
+      rm -f "$ZIP"
+      fail "Gradle distribution checksum verification failed"
+    fi
     rm -rf "$GRADLE_HOME"
     unzip -q "$ZIP" -d "$CACHE_ROOT"
   fi

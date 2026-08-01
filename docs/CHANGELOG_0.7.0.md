@@ -21,6 +21,9 @@
 - Adds explicit Android cloud-backup and device-transfer exclusions while retaining `allowBackup=false`.
 - Adds a cleartext-denying network-security policy.
 - Validates deep-link IDs as UUIDs and limits external shared text and notification-import payload sizes.
+- Requires explicit confirmation before shared ticket text is imported.
+- Restricts automatic notification imports to the user-selected default SMS app and preserves the extracted sender during validation.
+- Marks tracking notifications private so Android can redact route, platform, carriage, and seat details on secured lock screens.
 - Whitelists all accepted platform-broadcast actions.
 - Removes ticket/route identifiers from notification diagnostic output.
 - Adds generated-artifact, capture, local SDK, and signing-material exclusions.
@@ -37,6 +40,7 @@
 
 - Advances the application to version 0.7.0 (version code 9).
 - Pins and verifies the Gradle 9.4.1 distribution checksum.
-- Adds `tools/validate_source.py` and runs it from `build.sh` when Python 3 is available.
+- Pins third-party GitHub Actions to immutable commit revisions.
+- Requires Python 3, runs source validation from `build.sh`, and verifies the checked-in source checksum manifest.
 - Adds a CI workflow for unit tests, lint, Android-test compilation, debug assembly, and release shrinking.
 - Removes stale build products from the delivery archive.

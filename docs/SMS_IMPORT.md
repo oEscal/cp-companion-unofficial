@@ -6,12 +6,12 @@ Ticket messages can be imported through:
 
 - Explicit inbox checking after granting `READ_SMS`.
 - Optional periodic incremental inbox checking after the user enables it.
-- Pasting or sharing message text.
-- Optional notification-listener detection.
+- Pasting message text, or confirming text received through Android's share target.
+- Optional notification-listener detection restricted to the user-selected default SMS app.
 
 All inbox scans share a process-wide coordinator, so a manual scan and a scheduled worker cannot overwrite each other's cursor or restore an older settings snapshot. Cursor fields are merged atomically into the latest DataStore settings.
 
-Inbox processing uses a received-time plus message-ID checkpoint. Notification imports use a persistent package/key/content fingerprint and mark it processed only after a successful ticket parse. Reimporting unchanged ticket data does not reset validation, reschedule alarms, or rewrite ticket rows.
+Inbox processing uses a received-time plus message-ID checkpoint. Notification imports accept candidates only from the default SMS application, preserve the extracted sender for CP checks, use a persistent package/key/content fingerprint, and mark it processed only after a successful ticket parse. Reimporting unchanged ticket data does not reset validation, reschedule alarms, or rewrite ticket rows.
 
 Future imported tickets default to automatic tracking. Historical or already-departed tickets are retained without an automation switch and cannot generate new CP polling schedules.
 
