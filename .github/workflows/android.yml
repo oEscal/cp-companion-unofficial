@@ -29,7 +29,7 @@ jobs:
       - run: python3 tools/validate_repository.py
       - run: python3 -m unittest discover -s tools/tests -v
       - run: tools/scan_secrets.sh
-      - uses: gradle/actions/wrapper-validation@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+      - uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
   build:
     runs-on: ubuntu-latest
