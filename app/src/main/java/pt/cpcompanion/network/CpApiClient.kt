@@ -341,7 +341,7 @@ class CpApiClient(
     private companion object {
         const val CP_ORIGIN = "https://www.cp.pt"
         const val CONFIG_URL = "$CP_ORIGIN/fe-config.json"
-        const val USER_AGENT = "CP-Companion-Android/0.7.0"
+        const val USER_AGENT = "CP-Companion-Android/1.0.0"
         const val MAX_RETRY_AFTER_SECONDS = 24L * 60L * 60L
         const val CONFIG_MAX_AGE_MILLIS = 24L * 60L * 60L * 1000L
         const val CATALOG_TTL_MS = 6L * 60L * 60L * 1000L

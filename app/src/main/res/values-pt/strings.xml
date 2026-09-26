@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">CP Companion</string>
+    <string name="app_name">CP Companion — Unofficial</string>
     <string name="tracking_channel_name">Acompanhamento ativo do comboio</string>
     <string name="tracking_channel_description">Atualizações silenciosas da viagem de comboio em acompanhamento</string>
     <string name="alerts_channel_name">Alertas de viagem</string>
@@ -301,4 +301,9 @@
     <string name="sms_found_no_ticket_created">Foi encontrada uma mensagem SMS de bilhete da CP, mas não foi possível criar um bilhete.</string>
     <string name="validating_passenger_segment">A validar o trajeto do passageiro</string>
     <string name="automatic_tracking_reenabled">Acompanhamento automático reativado</string>
+    <string name="about_app">Sobre o CP Companion</string>
+    <string name="unofficial_beta_notice">Versão beta não oficial, independente da CP — Comboios de Portugal. Os horários e o acompanhamento em segundo plano podem estar atrasados ou indisponíveis. As viagens importadas não substituem o seu bilhete válido.</string>
+    <string name="privacy_policy">Política de privacidade</string>
+    <string name="third_party_notices">Avisos de software de terceiros</string>
+    <string name="close_document">Fechar</string>
 </resources>

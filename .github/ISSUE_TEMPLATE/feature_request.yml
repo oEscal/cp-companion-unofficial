@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest a new capability or improvement.
+title: "[Feature request]"
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: "Describe the problem and desired outcome. Do not include real ticket references, SMS text, passenger details, QR codes, or credentials."
+  - type: input
+    id: summary
+    attributes:
+      label: Feature summary
+      description: A short description of the capability you would like.
+      placeholder: Let me...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: App area
+      options:
+        - Station and train information
+        - Journey entry and ticket import
+        - Tracking and notifications
+        - Accessibility or translation
+        - Privacy or security
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Explain the use case and who would benefit.
+      placeholder: When I..., it is difficult to...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: Describe the behavior you would expect from the app.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Optional. Mention any approach you have already tried.

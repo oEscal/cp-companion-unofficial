@@ -105,3 +105,10 @@ PLAN.md
 # Keep Room schema exports under version control when configured.
 !app/schemas/
 !app/schemas/**
+# Local assistant state, traffic captures, and release staging
+.agents/
+.codex/
+*.har
+dist/
+__pycache__/
+*.pyc

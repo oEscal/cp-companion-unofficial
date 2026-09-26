@@ -1,0 +1,103 @@
+name: Release APK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag (for example v1.0.0 or v1.0.0-beta.1)
+        required: true
+        type: string
+      draft:
+        description: Save as a draft instead of publishing immediately
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signed-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.source.outputs.tag }}
+      sha: ${{ steps.source.outputs.sha }}
+      prerelease: ${{ steps.source.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Validate release source
+        id: source
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: python3 tools/prepare_release.py --check-ref "refs/tags/$RELEASE_TAG" --github-output "$GITHUB_OUTPUT"
+
+  verify:
+    needs: resolve
+    uses: ./.github/workflows/android.yml
+    with:
+      checkout_ref: ${{ needs.resolve.outputs.sha }}
+
+  sign-and-release:
+    needs: [resolve, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          fetch-depth: 0
+      - name: Verify tag still points to the tested commit
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: python3 tools/prepare_release.py --check-ref "refs/tags/$RELEASE_TAG"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+      - name: Build and verify signed APK
+        env:
+          CP_RELEASE_KEYSTORE_BASE64: ${{ secrets.CP_RELEASE_KEYSTORE_BASE64 }}
+          CP_RELEASE_STORE_PASSWORD: ${{ secrets.CP_RELEASE_STORE_PASSWORD }}
+          CP_RELEASE_KEY_ALIAS: ${{ secrets.CP_RELEASE_KEY_ALIAS }}
+          # Optional when the key entry uses the keystore password.
+          CP_RELEASE_KEY_PASSWORD: ${{ secrets.CP_RELEASE_KEY_PASSWORD }}
+          CP_RELEASE_CERT_SHA256: ${{ vars.CP_RELEASE_CERT_SHA256 }}
+        run: tools/build_release.sh
+      - name: Package source and checksums
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: python3 tools/prepare_release.py --package --check-ref "refs/tags/$RELEASE_TAG"
+      - name: Create GitHub release with APK and source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
+          DRAFT: ${{ github.event_name == 'workflow_dispatch' && inputs.draft }}
+        run: |
+          flags=()
+          if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
+          if [[ "$DRAFT" == true ]]; then flags+=(--draft); fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/* --clobber
+            gh release edit "$RELEASE_TAG" --verify-tag \
+              --title "CP Companion $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md \
+              --draft="$DRAFT" --prerelease="$PRERELEASE"
+          else
+            gh release create "$RELEASE_TAG" dist/* --verify-tag "${flags[@]}" \
+              --title "CP Companion $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md
+          fi
