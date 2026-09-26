@@ -43,6 +43,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platform-tools
       - name: Install Android SDK
         run: sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0"
       - name: Test, lint, verify notices, and build
@@ -72,6 +74,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platform-tools
       - run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
       - name: Enable KVM
         run: |
