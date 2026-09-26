@@ -9,7 +9,14 @@ plugins {
 val releaseStorePath = providers.environmentVariable("CP_RELEASE_STORE_FILE").orNull
 val releaseStorePassword = providers.environmentVariable("CP_RELEASE_STORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("CP_RELEASE_KEY_ALIAS").orNull
-val releaseKeyPassword = providers.environmentVariable("CP_RELEASE_KEY_PASSWORD").orNull
+val releaseKeyPassword = providers.environmentVariable("CP_RELEASE_KEY_PASSWORD").orNull?.takeIf { it.isNotBlank() }
+val releaseCredentials = listOf(releaseStorePath, releaseStorePassword, releaseKeyAlias)
+val releaseSigningConfigured = releaseCredentials.all { !it.isNullOrBlank() }
+val releaseSigningDisabled = releaseCredentials.all { it == null } && releaseKeyPassword == null
+require(releaseSigningConfigured || releaseSigningDisabled) {
+    "Set CP_RELEASE_STORE_FILE, CP_RELEASE_STORE_PASSWORD, and CP_RELEASE_KEY_ALIAS together, or leave them unset. " +
+        "CP_RELEASE_KEY_PASSWORD is optional and defaults to CP_RELEASE_STORE_PASSWORD."
+}
 
 android {
     namespace = "pt.cpcompanion"
@@ -19,8 +26,8 @@ android {
         applicationId = "pt.cpcompanion"
         minSdk = 30
         targetSdk = 37
-        versionCode = 9
-        versionName = "0.7.0"
+        versionCode = 10
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -28,12 +35,12 @@ android {
     }
 
     signingConfigs {
-        if (listOf(releaseStorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { it != null }) {
+        if (releaseSigningConfigured) {
             create("release") {
                 storeFile = file(requireNotNull(releaseStorePath))
                 storePassword = releaseStorePassword
                 keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+                keyPassword = releaseKeyPassword ?: releaseStorePassword
             }
         }
     }
@@ -60,9 +67,9 @@ android {
     }
 
     packaging {
-        resources.excludes += setOf(
-            "/META-INF/{AL2.0,LGPL2.1}",
-            "META-INF/DEPENDENCIES",
+        resources.merges += setOf(
+            "META-INF/AL2.0", "META-INF/LGPL2.1", "META-INF/DEPENDENCIES",
+            "META-INF/LICENSE*", "META-INF/NOTICE*",
         )
     }
 
@@ -74,6 +81,23 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// Input to the notice generator; paths are local and never shipped in the APK.
+tasks.register("exportReleaseDependencies") {
+    inputs.files(configurations.named("releaseRuntimeClasspath"))
+    val output = layout.buildDirectory.file("reports/release-dependencies.tsv")
+    outputs.file(output)
+    doLast {
+        val artifacts = configurations.getByName("releaseRuntimeClasspath")
+            .resolvedConfiguration.resolvedArtifacts
+        output.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(artifacts.map {
+                "${it.moduleVersion.id}\t${it.file.absolutePath}"
+            }.sorted().joinToString("\n", postfix = "\n"))
+        }
     }
 }
 
