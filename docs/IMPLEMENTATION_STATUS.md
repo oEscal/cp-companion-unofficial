@@ -29,4 +29,4 @@
 
 ## Out of current verified scope
 
-Authenticated CP account, payment, purchase, card, and QR operations are not implemented because the supplied material does not establish a supported authorization and data contract. See `docs/api/unresolved.md` and `TODO.md`.
+Authenticated CP account, payment, purchase, card, and QR operations are not implemented because the supplied material does not establish a supported authorization and data contract. See `docs/api/unresolved.md` and `docs/KNOWN_LIMITATIONS.md`.

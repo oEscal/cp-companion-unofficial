@@ -1,0 +1,29 @@
+name: Bug report
+description: Report a reproducible problem without passenger or ticket data.
+body:
+  - type: markdown
+    attributes:
+      value: "Remove names, ticket references, SMS bodies, seats, QR codes, and credentials from reports. Use SECURITY.md for vulnerabilities."
+  - type: input
+    id: version
+    attributes:
+      label: App version and installation source
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Android version and device model
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected behavior, and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Relevant permissions and battery settings
+      description: For tracking issues, include notification, exact alarm, Battery Saver, and automation settings.

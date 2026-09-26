@@ -2,6 +2,7 @@
 """Fast source-only checks that do not require the Android SDK."""
 from __future__ import annotations
 
+import argparse
 import hashlib
 import re
 import sys
@@ -155,13 +156,9 @@ def check_project_invariants() -> None:
         "versioned user agent": 'USER_AGENT = "CP-Companion-Android/0.7.0"',
         "Gradle distribution": "gradle-9.4.1-bin.zip",
         "Gradle checksum": "distributionSha256Sum=2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb",
-        "Gradle bootstrap checksum verification": "sha256sum --check --status",
+        "Gradle wrapper invocation": '"$ROOT/gradlew"',
         "private fallback tracking notification": ".setVisibility(NotificationCompat.VISIBILITY_PRIVATE)",
         "private progress tracking notification": ".setVisibility(Notification.VISIBILITY_PRIVATE)",
-        "pinned checkout action": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-        "pinned Java action": "actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9",
-        "pinned Android action": "android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407",
-        "pinned artifact action": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     }
     haystacks = {
         "applicationId": app_build,
@@ -176,21 +173,18 @@ def check_project_invariants() -> None:
         "versioned user agent": api_client,
         "Gradle distribution": wrapper,
         "Gradle checksum": wrapper,
-        "Gradle bootstrap checksum verification": build_script,
+        "Gradle wrapper invocation": build_script,
         "private fallback tracking notification": notification_factory,
         "private progress tracking notification": notification_factory,
-        "pinned checkout action": workflow,
-        "pinned Java action": workflow,
-        "pinned Android action": workflow,
-        "pinned artifact action": workflow,
     }
     for label, fragment in required_fragments.items():
         if fragment not in haystacks[label]:
             error(f"Project invariant missing: {label}")
 
-    for forbidden in (ROOT / "local.properties", ROOT / "app" / "release.keystore"):
-        if forbidden.exists():
-            error(f"Local or signing material must not be packaged: {forbidden.relative_to(ROOT)}")
+    for path in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        for action in re.findall(r"uses:\s*([^\s#]+)", path.read_text()):
+            if not action.startswith("./") and not re.fullmatch(r"[A-Za-z0-9_./-]+@[0-9a-f]{40}", action):
+                error(f"Action must be pinned to an immutable revision: {action}")
 
     if "VISIBILITY_PUBLIC" in notification_factory:
         error("Tracking notifications must not expose travel details with VISIBILITY_PUBLIC")
@@ -201,11 +195,19 @@ def check_project_invariants() -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--checksums", action="store_true", help="Also verify the optional source-delivery manifest")
+    args = parser.parse_args()
     parse_xml_files()
     check_translation_parity()
+    privacy = ROOT / "PRIVACY.md"
+    bundled_privacy = APP / "src/main/assets/privacy.txt"
+    if not privacy.is_file() or not bundled_privacy.is_file() or privacy.read_bytes() != bundled_privacy.read_bytes():
+        error("PRIVACY.md and the bundled English privacy policy must match")
     check_resource_references()
     check_project_invariants()
-    check_source_checksums()
+    if args.checksums:
+        check_source_checksums()
     if ERRORS:
         print("Source validation failed:", file=sys.stderr)
         for message in ERRORS:

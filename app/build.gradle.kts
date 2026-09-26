@@ -10,6 +10,10 @@ val releaseStorePath = providers.environmentVariable("CP_RELEASE_STORE_FILE").or
 val releaseStorePassword = providers.environmentVariable("CP_RELEASE_STORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("CP_RELEASE_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("CP_RELEASE_KEY_PASSWORD").orNull
+val releaseCredentials = listOf(releaseStorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+require(releaseCredentials.all { it == null } || releaseCredentials.all { !it.isNullOrBlank() }) {
+    "Set all four CP_RELEASE_* signing variables, or leave all four unset."
+}
 
 android {
     namespace = "pt.cpcompanion"
@@ -60,9 +64,9 @@ android {
     }
 
     packaging {
-        resources.excludes += setOf(
-            "/META-INF/{AL2.0,LGPL2.1}",
-            "META-INF/DEPENDENCIES",
+        resources.merges += setOf(
+            "META-INF/AL2.0", "META-INF/LGPL2.1", "META-INF/DEPENDENCIES",
+            "META-INF/LICENSE*", "META-INF/NOTICE*",
         )
     }
 
@@ -74,6 +78,23 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// Input to the notice generator; paths are local and never shipped in the APK.
+tasks.register("exportReleaseDependencies") {
+    inputs.files(configurations.named("releaseRuntimeClasspath"))
+    val output = layout.buildDirectory.file("reports/release-dependencies.tsv")
+    outputs.file(output)
+    doLast {
+        val artifacts = configurations.getByName("releaseRuntimeClasspath")
+            .resolvedConfiguration.resolvedArtifacts
+        output.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(artifacts.map {
+                "${it.moduleVersion.id}\t${it.file.absolutePath}"
+            }.sorted().joinToString("\n", postfix = "\n"))
+        }
     }
 }
 

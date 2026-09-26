@@ -1,101 +1,78 @@
-# CP Companion 0.7.0
+# CP Companion
 
-Unofficial native Android application for CP station boards, train-trip details, locally imported passenger tickets, and automatic live journey tracking.
+**Unofficial Android beta for train journeys in Portugal.** View CP station boards and train details, import journey information from tickets, and follow a journey with an ongoing notification.
 
-## Current behavior
+This project is independent of, and is not endorsed by, CP — Comboios de Portugal. Imported journey records are not travel documents: keep your valid ticket. Live data and automatic background activation can be delayed or unavailable.
 
-Validated future tickets enable automatic tracking by default. The app schedules activation for one hour before the passenger departure, recovers scheduling after reboot, application update, clock/time-zone changes, or exact-alarm permission changes, and starts an ongoing journey notification without requiring a manual **Track now** action. Polling adapts to journey phase, shares identical requests, retains bounded stale data during CP outages or HTTP 429 cooldowns, and stops after a confirmed destination arrival or terminal disruption.
+## Features
 
-Recent scheduled arrivals are not treated as proof that a delayed train has completed. The automation layer keeps a six-hour verification window and uses live CP data before terminalizing the journey.
+- Station departures/arrivals, train calling points, and journey status.
+- Manual entry, confirmed paste/share import, opt-in SMS inbox import, and optional default-SMS-app notification detection.
+- Automatic tracking scheduled one hour before departure for validated future journeys, with recovery after reboot and schedule changes.
+- Local encrypted ticket storage, English and Portuguese UI, and light/dark/system themes.
 
-The project contains one application with application ID `pt.cpcompanion`. Direct SMS inbox import, confirmed paste/share import, and default-SMS-app notification detection are included in the same app. Inbox access remains opt-in at runtime.
+Account login, purchases, payments, refunds, and ticket QR/PDF retrieval are not implemented. See [known limitations](docs/KNOWN_LIMITATIONS.md) and [upstream integration](docs/UPSTREAM.md).
 
-## 0.7.0 finalization
+## Screenshots
 
-- Applies Material 3 Expressive globally through `MaterialExpressiveTheme`, expressive shapes/typography, dynamic color, and System/Light/Dark modes.
-- Updates Material 3 Expressive to `1.5.0-alpha24` and AndroidX Concurrent to `1.3.0`.
-- Fixes delayed-trip automation being completed solely from scheduled arrival time.
-- Preserves coroutine cancellation in workers, validation, imports, and UI loading paths instead of turning cancellation into retries or errors.
-- Makes catalogue persistence atomic and self-healing after interrupted or corrupt writes.
-- Hardens encrypted-value decoding and removes only unreadable entries after key invalidation or restore damage.
-- Enforces HTTPS-only CP traffic, exact gateway host/port/path validation, and rejects credentials, queries, and fragments in runtime service URLs.
-- Adds explicit backup/device-transfer exclusions and keeps Android backup disabled for ticket and tracking data.
-- Validates exported activity input, requires confirmation before importing shared text, restricts notification detection to the default SMS app, and bounds shared/deep-link/notification input.
-- Makes the global HTTP 429 cooldown update atomic and bounds `Retry-After` to 24 hours.
-- Removes journey/ticket identifiers from notification diagnostic logging.
-- Verifies fallback Gradle downloads and pins CI actions to immutable revisions.
-- Completes English/Portuguese resource parity for the modified search, trip-status, automation, and error surfaces.
-- Adds source validation, archive exclusions, and an Android CI workflow.
+> Screenshot placeholder: add redacted or synthetic screenshots to [docs/screenshots](docs/screenshots/README.md), then replace this block with the image links. Suggested views: station board, journey details, ticket list, and tracking notification.
 
-See `docs/CHANGELOG_0.7.0.md`, `docs/IMPLEMENTATION_STATUS.md`, `docs/VALIDATION.md`, and `TODO.md`.
+## Install
+
+Requires **Android 11 (API 30) or newer**. Check [Releases](https://github.com/oEscal/my-cp-companion/releases) for a signed beta APK. If no release is listed, build from source; CI artifacts are development builds.
+
+1. Download `cp-companion.apk` and `SHA256SUMS` from the same release. Compare the APK's SHA-256 with the listed value.
+2. Open the APK on Android and allow installation from that browser/file manager when prompted.
+3. Grant notifications for visible tracking. SMS inbox, notification-listener, and exact-alarm access are optional and explained in the Automation tab.
+
+Install future releases over the existing app to preserve journeys. Updates must use the same signing certificate. A debug installation uses a different certificate; uninstalling it to install a release deletes its local data. See [privacy and deletion](PRIVACY.md).
 
 ## Build
 
-Requirements:
+Use JDK 17 (the version used by CI), Python 3.10+, Android SDK Platform 37, and Build Tools 37.0.0. Initial dependency downloads require network access. Linux, macOS, and Windows are supported by the committed Gradle wrapper.
 
-- JDK 17 or newer
-- Python 3 for source and checksum validation
-- Android SDK platform 37
-- Android Build Tools 36.0.0 or a compatible newer version
-- Network access for uncached Gradle and Maven dependencies
+```bash
+git clone https://github.com/oEscal/my-cp-companion.git
+cd my-cp-companion
+```
 
-Run:
+Open the project in Android Studio and install the requested SDK components, or use the SDK command-line tools. Set `ANDROID_HOME` to the SDK directory, or copy `local.properties.example` to `local.properties` and set `sdk.dir`. The local file is ignored and is allowed during development.
+
+On Linux/macOS:
 
 ```bash
 ./build.sh
 ```
 
-The script first validates XML, resources, translation parity, and security/build invariants. It then runs:
+On Windows (PowerShell):
 
-```text
-:app:testDebugUnitTest
-:app:lintDebug
-:app:assembleDebugAndroidTest
-:app:assembleDebug
-:app:assembleRelease
+```powershell
+python tools/validate_source.py
+python tools/validate_repository.py
+.\gradlew.bat :app:exportReleaseDependencies :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest :app:assembleDebug :app:assembleRelease
+python tools/generate_notices.py --check
 ```
 
-After intentional source changes, refresh and verify the delivery checksums with:
+The script runs source checks, unit tests, lint, instrumentation APK compilation, debug assembly, release shrinking, and dependency-notice verification. It does not execute device tests without a connected device and the task below. Release output is unsigned unless all four `CP_RELEASE_*` signing variables are configured.
+
+Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
 ```bash
-python3 tools/update_source_checksums.py
-python3 tools/validate_source.py
+./gradlew :app:connectedDebugAndroidTest
 ```
 
-The archive intentionally does not contain generated build output. When the Gradle wrapper JAR is absent, `build.sh` downloads Gradle 9.4.1 and verifies the official SHA-256 checksum before execution.
+CI runs instrumentation tests on Android API 30 and 36 emulators. See [validation evidence](docs/VALIDATION.md) for the distinction between automated tests and the remaining real-device journey checks.
 
-Expected debug APK:
+## Contribute and get help
 
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for architecture, checks, and dependency updates. Report bugs in [Issues](https://github.com/oEscal/my-cp-companion/issues), including app/device versions and reproduction steps. Use synthetic journeys and redact screenshots; never post real ticket references, SMS text, passenger details, QR codes, or credentials.
 
-To run connected tests after building:
+Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. There is no guaranteed response time for this volunteer beta project.
 
-```bash
-./build.sh connectedDebugAndroidTest
-```
+## Privacy and attribution
 
-## Optional release signing
+SMS and notification parsing happen locally. Requests for station/train data go directly to CP, which receives the requested train/station/date and connection metadata. Read the [privacy policy](PRIVACY.md); it and third-party notices are also available offline in the Automation tab.
 
-Set all four variables before running `./build.sh`:
+Third-party licenses are preserved separately from the maintainer-selected project license. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). CP names, marks, and upstream data are not relicensed by this repository.
 
-```text
-CP_RELEASE_STORE_FILE
-CP_RELEASE_STORE_PASSWORD
-CP_RELEASE_KEY_ALIAS
-CP_RELEASE_KEY_PASSWORD
-```
-
-Without them, Gradle can validate release compilation and shrinking, but the release artifact is not suitable for distribution.
-
-## Permissions and privacy
-
-- `READ_SMS` is requested only when the user checks the inbox or enables automatic inbox import.
-- `POST_NOTIFICATIONS` is required for visible ongoing journey tracking.
-- `SCHEDULE_EXACT_ALARM` is used for preferred T-60 activation; inexact AlarmManager and WorkManager recovery remain available.
-- Notification-listener access is optional and protected by Android's binding permission.
-- Shared ticket text requires confirmation before it is saved, and automatic notification detection accepts candidates only from the user-selected default SMS app.
-- Tracking notifications are private on the lock screen; full route, platform, carriage, and seat details remain available after the device applies the user's notification privacy settings.
-- SMS and notification parsing are local. The app does not log SMS bodies, passenger names, ticket references, QR contents, or CP runtime headers.
-- The app uses observed read-only CP timetable/configuration operations. Authenticated account, payment, ticket-purchase, card, and QR operations remain absent until their contract and authorization are verified.
+Maintainers: follow the [signed release guide](docs/RELEASING.md) and [known limitations](docs/KNOWN_LIMITATIONS.md).

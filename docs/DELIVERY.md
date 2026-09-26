@@ -1,9 +1,7 @@
-# Delivery summary — 0.7.0
+# Source delivery
 
-This delivery contains one CP Companion Android source project using application ID `pt.cpcompanion`.
+The public source package is generated from an exact clean release tag using `tools/prepare_release.py --package`. It excludes generated APKs, local SDK paths, signing material, caches, and local planning notes. APKs belong in release assets, not Git. Existing historical APKs/logs are not removed by a current-tree cleanup; no history was rewritten during preparation.
 
-Included are all existing application features plus the delayed-journey automation correction, cancellation-safe background work, atomic/self-healing caches, encrypted-state recovery, stricter network and external-input validation, explicit backup exclusion, Material 3 Expressive consistency, localization/accessibility corrections, source validation, CI, and release documentation.
+The source archive accompanies the signed APK, certificate report, and SHA256SUMS in the draft prerelease. Development checkout checks allow ignored local SDK configuration. Optional source-delivery checksum verification is separate from normal builds.
 
-Generated APKs, Gradle build directories, local SDK configuration, captures, caches, and signing material are excluded. The archive is source-only.
-
-The execution environment used for this revision could not download or install an Android SDK because outbound DNS/network access was blocked. Therefore the modified source was not represented as freshly Gradle-compiled here. Run `./build.sh` on a configured Android environment; CI is included to run the complete validation set.
+See [VALIDATION.md](VALIDATION.md) for observed results and [RELEASING.md](RELEASING.md) for the publication process and remaining external requirements.

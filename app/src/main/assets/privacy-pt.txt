@@ -1,0 +1,26 @@
+Política de privacidade do CP Companion
+Atualizada em 7 de setembro de 2026
+
+O CP Companion é uma aplicação Android não oficial. Esta versão não tem servidor do programador, publicidade, ferramentas de análise de utilização ou envio automático de relatórios de falhas.
+
+Dados no dispositivo
+
+A aplicação guarda dados das viagens importadas: comboio, data, origem, destino, horários, referência do bilhete, carruagem, lugar e identificadores da origem da importação. Os dados dos bilhetes e o estado de recuperação do acompanhamento são cifrados com uma chave no Android Keystore. As preferências, os pontos de controlo da importação e as caches de horários públicos também ficam no dispositivo. Os identificadores das linhas da base de dados e as datas de atualização não são cifrados; continuam sujeitos à proteção do armazenamento do dispositivo. As cópias de segurança Android e a transferência destes dados entre dispositivos estão desativadas.
+
+O acesso à caixa de SMS é opcional. Com a permissão READ_SMS, cada pesquisa examina uma janela limitada de mensagens recentes (até 2 000), incluindo mensagens que não são da CP, para reconhecer bilhetes localmente. As pesquisas automáticas exigem ativação separada. O texto integral das mensagens é processado em memória e não é arquivado nem enviado. Apenas os campos extraídos do bilhete são guardados. A importação de texto colado ou partilhado pede confirmação.
+
+O acesso às notificações é opcional e corresponde a uma permissão Android abrangente. O Android pode entregar notificações de outras aplicações ao serviço; o CP Companion rejeita as que não pertencem à aplicação de SMS predefinida antes de analisar possíveis bilhetes. Guarda impressões de deduplicação e os campos da viagem, não um arquivo de notificações. O remetente de uma SMS ou notificação não prova criptograficamente a autenticidade de um bilhete.
+
+Ligações à rede
+
+A aplicação liga-se diretamente por HTTPS a www.cp.pt para obter configuração e a api-gateway.cp.pt para consultar estações, painéis, informações e horários de comboios. Os pedidos podem incluir códigos de estação, números de comboio, datas e filtros de horário. A CP e os seus fornecedores de infraestrutura recebem o endereço IP e os metadados normais dos pedidos; o tratamento desses dados segue as políticas desses serviços. A aplicação não lhes envia textos de SMS, referências de bilhetes, lugares, nomes de passageiros ou conteúdos de notificações. Abrir uma ligação de apoio ou do projeto contacta esse sítio no navegador.
+
+Notificações e controlo dos dados
+
+As notificações podem mostrar percurso, plataforma, carruagem e lugar. Usam visibilidade privada no ecrã bloqueado, mas as definições do dispositivo controlam o que aparece. Desativar notificações pode impedir o acompanhamento fiável. A permissão de alarmes exatos melhora o agendamento; o Android pode atrasar os mecanismos alternativos.
+
+Elimine um bilhete no separador Bilhetes para remover o registo local e o seu acompanhamento ativo. Trabalho já agendado pode permanecer brevemente até à reconciliação. A SMS original não é eliminada e uma nova pesquisa explícita ou notificação correspondente pode voltar a importar o bilhete. Desative a importação automática no separador Automação e revogue as permissões de SMS e de acesso às notificações nas definições Android para parar essas formas de importação. Para apagar todos os dados, use Definições Android > Aplicações > CP Companion > Armazenamento > Limpar armazenamento, ou desinstale a aplicação. Perderá as viagens guardadas, pois não existem cópias de segurança. As caches públicas expiram ou são substituídas durante a utilização; os bilhetes permanecem até serem eliminados ou até limpar os dados.
+
+Contacto
+
+Para questões de privacidade, abra um pedido sem dados pessoais em https://github.com/oEscal/my-cp-companion/issues. Para vulnerabilidades ou informações sensíveis, consulte https://github.com/oEscal/my-cp-companion/blob/master/SECURITY.md e use o canal privado aí indicado. Nunca publique SMS reais, nomes, referências de bilhetes, códigos QR ou credenciais.

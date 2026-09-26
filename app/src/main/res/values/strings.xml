@@ -298,4 +298,9 @@
     <string name="sms_found_no_ticket_created">A CP ticket SMS was found, but no ticket could be created.</string>
     <string name="validating_passenger_segment">Validating the passenger segment</string>
     <string name="automatic_tracking_reenabled">Automatic tracking re-enabled</string>
+    <string name="about_app">About CP Companion</string>
+    <string name="unofficial_beta_notice">Unofficial beta, independent of CP — Comboios de Portugal. Timetables and background tracking may be delayed or unavailable. Imported journeys do not replace your valid ticket.</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="third_party_notices">Third-party software notices</string>
+    <string name="close_document">Close</string>
 </resources>

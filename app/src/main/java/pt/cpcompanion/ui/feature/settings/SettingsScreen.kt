@@ -78,6 +78,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -139,6 +140,7 @@ internal fun SettingsScreen(
         )
     }
     var showNotificationDisclosure by remember { mutableStateOf(false) }
+    var document by remember { mutableStateOf<String?>(null) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         notificationAccessEnabled = isNotificationListenerEnabled(context)
         if (Build.VERSION.SDK_INT >= 36) {
@@ -196,6 +198,12 @@ internal fun SettingsScreen(
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        item {
+            Text(stringResource(R.string.about_app), style = MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.unofficial_beta_notice), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { document = "privacy" }) { Text(stringResource(R.string.privacy_policy)) }
+            TextButton(onClick = { document = "notices" }) { Text(stringResource(R.string.third_party_notices)) }
+        }
         item {
             Text(stringResource(R.string.appearance), style = MaterialTheme.typography.headlineMedium)
             Text(
@@ -376,6 +384,16 @@ internal fun SettingsScreen(
                 }
             }
         }
+    }
+    document?.let { selected ->
+        val portuguese = LocalConfiguration.current.locales[0].language == "pt"
+        LegalDocumentDialog(
+            title = stringResource(if (selected == "privacy") R.string.privacy_policy else R.string.third_party_notices),
+            asset = if (selected == "privacy") {
+                if (portuguese) "privacy-pt.txt" else "privacy.txt"
+            } else "third-party-notices.txt",
+            onDismiss = { document = null },
+        )
     }
     if (showNotificationDisclosure) {
         AlertDialog(
