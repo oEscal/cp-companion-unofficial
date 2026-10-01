@@ -115,7 +115,7 @@ Requires **Android 11 (API 30) or newer**. Check [Releases](https://github.com/o
 
 <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/oEscal/my-cp-companion"><img src="docs/assets/badge_obtainium.png" alt="Get it on Obtainium" height="72"></a>
 
-### Option 2: Install an APK manually
+### Option 2: Install the APK manually
 
 1. Download `cp-companion.apk` and `SHA256SUMS` from the same release. Compare the APK's SHA-256 with the listed value.
 2. Open the APK on Android and allow installation from that browser/file manager when prompted.
