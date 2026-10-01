@@ -6,7 +6,7 @@ CP Companion is an independent, unofficial project. It is not affiliated with, e
 
 “CP”, “Comboios de Portugal”, and any associated names, trademarks, logos, and other distinctive signs belong to their respective rights holders. This project does not claim any rights over them. No CP trademark, branding, data, or other third-party material is relicensed under this project's open-source licence.
 
-Train, station, timetable, and operational information displayed by the application is requested on demand from publicly accessible services operated by CP and used by its public-facing services. These requests are made directly from the user's device to CP; the project maintainer does not operate a proxy or backend that retrieves, stores, aggregates, or redistributes this information. Availability, accuracy, completeness, and continued accessibility of these services are controlled by their respective providers and are not guaranteed by this project.
+Train, station, timetable, and operational information displayed by the application is requested on demand from publicly accessible services made available by CP and used by its public-facing services. These requests are made directly from the user's device to CP; the project maintainer does not operate a proxy or backend that retrieves, stores, aggregates, or redistributes this information. Availability, accuracy, completeness, and continued accessibility of these services are controlled by their respective providers and are not guaranteed by this project.
 
 Imported ticket and journey information is processed locally and is provided only as a convenience. CP Companion does not issue, replace, validate, or modify transport tickets. Users must retain a valid ticket and should consult official CP information where necessary.
 
@@ -30,7 +30,82 @@ During the journey, the notification continues to show delays and the time remai
 
 ## Screenshots
 
-> Screenshot placeholder: add redacted or synthetic screenshots to [docs/screenshots](docs/screenshots/README.md), then replace this block with the image links. Suggested views: station board, journey details, ticket list, and tracking notification.
+Ongoing trip progress uses an Android Live Update. Ticket-import confirmations and event alerts, such as boarding and arrival notices, are standard notifications.
+
+<details>
+<summary>View the app walkthrough</summary>
+
+![Muted animated preview of the app walkthrough](screenshots/app-walkthrough.gif)
+
+[Watch the full 2-minute walkthrough (MP4)](screenshots/app-walkthrough.mp4)
+
+</details>
+
+<details>
+<summary>View notifications and status-chip screenshots</summary>
+
+**Notifications**
+
+<table>
+  <tr>
+    <th>Early trip tracking</th>
+    <th>Before boarding</th>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <a href="screenshots/live-update-early-journey.png"><img src="screenshots/live-update-early-journey.png" width="210" alt="Live Update around an hour before arrival, showing next stop, delay, platform, carriage, and seat"></a><br>
+      <sub>About an hour before arrival, tracking is already active with the next stop and ticket details, before an approaching-station alert.</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="screenshots/notifications-before-boarding.png"><img src="screenshots/notifications-before-boarding.png" width="210" alt="Live Update and boarding notification"></a><br>
+      <sub>Live Update with platform and seat details; a separate standard notification says boarding is near.</sub>
+    </td>
+  </tr>
+  <tr>
+    <th>Approaching the destination</th>
+    <th>After arrival</th>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <a href="screenshots/notifications-approaching-destination.png"><img src="screenshots/notifications-approaching-destination.png" width="210" alt="Live Update and approaching-station notification"></a><br>
+      <sub>Live Update with the next-stop countdown and ticket details, alongside a standard approaching-station alert.</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="screenshots/notification-arrived.png"><img src="screenshots/notification-arrived.png" width="210" alt="Standard train-arrival notification"></a><br>
+      <sub>A standard notification confirms the train has arrived.</sub>
+    </td>
+  </tr>
+</table>
+
+**Status-bar chips**
+
+<table>
+  <thead>
+    <tr>
+      <th>Platform and countdown</th>
+      <th>Carriage and seat</th>
+      <th>Time remaining in trip</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center" width="33%">
+        <a href="screenshots/status-chip-pre-arrival-platform.png"><img src="screenshots/status-chip-pre-arrival-platform.png" width="280" alt="Status chip showing platform 6 and 47 minutes"></a><br>
+        <sub>About an hour before arrival: platform and time to arrival.</sub>
+      </td>
+      <td align="center" width="33%">
+        <a href="screenshots/status-chip-pre-arrival-seat.png"><img src="screenshots/status-chip-pre-arrival-seat.png" width="280" alt="Status chip showing carriage 24 and seat 93"></a><br>
+        <sub>Five minutes before arrival: carriage and seat numbers.</sub>
+      </td>
+      <td align="center" width="33%">
+        <a href="screenshots/status-chip-in-trip-countdown.png"><img src="screenshots/status-chip-in-trip-countdown.png" width="280" alt="Status chip showing 96 minutes remaining"></a><br>
+        <sub>Shown five minutes after the trip starts: time to destination; carriage and seat details remain in the ongoing notification.</sub>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+</details>
 
 ## Install
 
