@@ -47,7 +47,7 @@ jobs:
         run: sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;37.0.0"
       - name: Test, lint, verify notices, and build
         run: ./build.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: android-build-and-reports
@@ -85,7 +85,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: ./gradlew --no-daemon :app:connectedDebugAndroidTest
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: device-tests-api-${{ matrix.api-level }}
