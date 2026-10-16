@@ -32,17 +32,13 @@ During the journey, the notification continues to show delays and the time remai
 
 Ongoing trip progress uses an Android Live Update. Ticket-import confirmations and event alerts, such as boarding and arrival notices, are standard notifications.
 
-<details>
-<summary>View the app walkthrough</summary>
+### App walkthrough
 
 ![Muted animated preview of the app walkthrough](screenshots/app-walkthrough.gif)
 
 [Watch the full 2-minute walkthrough (MP4)](screenshots/app-walkthrough.mp4)
 
-</details>
-
-<details>
-<summary>View notifications and status-chip screenshots</summary>
+### Notifications and status-chip screenshots
 
 **Notifications**
 
@@ -105,7 +101,6 @@ Ongoing trip progress uses an Android Live Update. Ticket-import confirmations a
   </tbody>
 </table>
 
-</details>
 
 ## Install
 
