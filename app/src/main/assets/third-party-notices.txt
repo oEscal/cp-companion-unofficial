@@ -320,13 +320,13 @@ androidx.window:window:1.5.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
 Metadata: https://dl.google.com/dl/android/maven2/androidx/window/window/1.5.0/window-1.5.0.pom
 
-androidx.work:work-runtime-ktx:2.11.2
+androidx.work:work-runtime-ktx:2.12.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/work/work-runtime-ktx/2.11.2/work-runtime-ktx-2.11.2.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/work/work-runtime-ktx/2.12.0/work-runtime-ktx-2.12.0.pom
 
-androidx.work:work-runtime:2.11.2
+androidx.work:work-runtime:2.12.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/work/work-runtime/2.11.2/work-runtime-2.11.2.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/work/work-runtime/2.12.0/work-runtime-2.12.0.pom
 
 com.google.guava:listenablefuture:1.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
@@ -445,8 +445,8 @@ androidx.sqlite:sqlite-android:2.6.2 / META-INF/androidx/sqlite/sqlite/LICENSE.t
 androidx.sqlite:sqlite-framework-android:2.6.2 / META-INF/androidx/sqlite/sqlite-framework/LICENSE.txt
 androidx.window:window-core-android:1.5.0 / META-INF/androidx/window/window-core/LICENSE.txt
 androidx.window:window:1.5.0 / META-INF/androidx/window/window/LICENSE.txt
-androidx.work:work-runtime-ktx:2.11.2 / META-INF/androidx/work/work-runtime-ktx/LICENSE.txt
-androidx.work:work-runtime:2.11.2 / META-INF/androidx/work/work-runtime/LICENSE.txt
+androidx.work:work-runtime-ktx:2.12.0 / META-INF/androidx/work/work-runtime-ktx/LICENSE.txt
+androidx.work:work-runtime:2.12.0 / META-INF/androidx/work/work-runtime/LICENSE.txt
 
 Apache License
                            Version 2.0, January 2004
