@@ -124,17 +124,17 @@ androidx.concurrent:concurrent-futures:1.3.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
 Metadata: https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.3.0/concurrent-futures-1.3.0.pom
 
-androidx.core:core-ktx:1.19.0
+androidx.core:core-ktx:1.19.1
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.19.0/core-ktx-1.19.0.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.19.1/core-ktx-1.19.1.pom
 
 androidx.core:core-viewtree:1.0.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
 Metadata: https://dl.google.com/dl/android/maven2/androidx/core/core-viewtree/1.0.0/core-viewtree-1.0.0.pom
 
-androidx.core:core:1.19.0
+androidx.core:core:1.19.1
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/core/core/1.19.0/core-1.19.0.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/core/core/1.19.1/core-1.19.1.pom
 
 androidx.customview:customview-poolingcontainer:1.0.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
@@ -405,9 +405,9 @@ androidx.compose.ui:ui-unit-android:1.12.0-beta01 / META-INF/androidx/compose/ui
 androidx.compose.ui:ui-util-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui-util/LICENSE.txt
 androidx.concurrent:concurrent-futures-ktx:1.3.0 / META-INF/androidx/concurrent/concurrent-futures-ktx/LICENSE.txt
 androidx.concurrent:concurrent-futures:1.3.0 / META-INF/androidx/concurrent/concurrent-futures/LICENSE.txt
-androidx.core:core-ktx:1.19.0 / META-INF/androidx/core/core-ktx/LICENSE.txt
+androidx.core:core-ktx:1.19.1 / META-INF/androidx/core/core-ktx/LICENSE.txt
 androidx.core:core-viewtree:1.0.0 / META-INF/androidx/core/core-viewtree/LICENSE.txt
-androidx.core:core:1.19.0 / META-INF/androidx/core/core/LICENSE.txt
+androidx.core:core:1.19.1 / META-INF/androidx/core/core/LICENSE.txt
 androidx.datastore:datastore-android:1.2.1 / META-INF/androidx/datastore/datastore/LICENSE.txt
 androidx.datastore:datastore-core-android:1.2.1 / META-INF/androidx/datastore/datastore-core/LICENSE.txt
 androidx.datastore:datastore-core-okio-jvm:1.2.1 / META-INF/androidx/datastore/datastore-core-okio/LICENSE.txt
