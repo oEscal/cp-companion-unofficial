@@ -4,7 +4,7 @@ The project license does not replace upstream licenses. Release runtime componen
 
 The APK bundles [complete generated notices](app/src/main/assets/third-party-notices.txt), available offline in the Automation tab > Third-party software notices. These contain Maven license declarations, embedded copyright/license/NOTICE files (including notices inside AAR class JARs), the Apache-2.0 text, the protobuf BSD notice, and the MPL-2.0 text for OkHttp's bundled Public Suffix List data. Original resource license metadata is also retained during Android packaging.
 
-The Gradle wrapper and generated launchers are from Gradle 9.4.1, licensed under Apache-2.0; see [Gradle's license](https://github.com/gradle/gradle/blob/v9.4.1/LICENSE) and the [included Apache license text](docs/third-party/Apache-2.0.txt).
+The Gradle wrapper and generated launchers are from Gradle 9.6.0, licensed under Apache-2.0; see [Gradle's license](https://github.com/gradle/gradle/blob/v9.6.0/LICENSE) and the [included Apache license text](docs/third-party/Apache-2.0.txt).
 
 The Obtainium badge in the README is copied from [ImranR98/Obtainium](https://github.com/ImranR98/Obtainium), which is licensed under GPL-3.0. The original [badge asset](https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png) is stored at `docs/assets/badge_obtainium.png`.
 
