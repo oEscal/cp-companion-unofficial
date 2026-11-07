@@ -303,4 +303,12 @@
     <string name="privacy_policy">Privacy policy</string>
     <string name="third_party_notices">Third-party software notices</string>
     <string name="close_document">Close</string>
+    <string name="smart_band_10">Smart Band 10</string>
+    <string name="smart_band_10_experimental">Experimental live tracking</string>
+    <string name="smart_band_10_body">Optionally send the active journey dashboard to a Xiaomi Smart Band 10 through Gadgetbridge. CP Companion remains responsible for all train data and tracking.</string>
+    <string name="smart_band_device_address">Band Bluetooth address</string>
+    <string name="smart_band_sync">Sync to Smart Band 10</string>
+    <string name="smart_band_ready">Configured. Updates are sent only while an active journey exists.</string>
+    <string name="smart_band_setup_required">Enter a valid address and complete the Gadgetbridge setup before enabling useful synchronization.</string>
+    <string name="smart_band_gadgetbridge_setup">In Gadgetbridge, enable the Intent API and “Allow messages to watch apps” for this band. A broadcast is not proof of delivery. This integration is experimental.</string>
 </resources>

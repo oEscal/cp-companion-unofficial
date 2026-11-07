@@ -26,6 +26,7 @@ During the journey, the notification continues to show delays and the time remai
 - Manual entry, confirmed paste/share import, opt-in SMS inbox import, and optional default-SMS-app notification detection.
 - Automatic tracking scheduled one hour before departure for validated future journeys, with recovery after reboot and schedule changes.
 - Local encrypted ticket storage, English and Portuguese UI, and light/dark/system themes.
+- Optional experimental Xiaomi Smart Band 10 live dashboard through Gadgetbridge, disabled by default. See [the integration notes](docs/smart-band-10.md).
 - Lightweight install: under 5 MB on-device, excluding locally stored ticket data imported from SMS messages.
 
 ## Screenshots

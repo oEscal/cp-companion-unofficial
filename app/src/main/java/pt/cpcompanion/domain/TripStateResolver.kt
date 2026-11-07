@@ -129,6 +129,12 @@ class TripStateResolver {
             else -> EventTime(null, null, ExpectedTimeSource.UNKNOWN)
         }
 
+        val nextStop = resolved.getOrNull(nextStopIndex)
+        val nextStopScheduled = nextStop?.scheduledArrival ?: nextStop?.scheduledDeparture
+        val nextStopExpected = nextStop?.expectedArrival ?: nextStop?.expectedDeparture
+        val nextStopSource = nextStop?.arrivalSource?.ifUnknown(nextStop.departureSource)
+            ?: ExpectedTimeSource.UNKNOWN
+
         val delay = when (phase) {
             PassengerPhase.PRE_TRIP,
             PassengerPhase.APPROACHING_ORIGIN,
@@ -210,6 +216,9 @@ class TripStateResolver {
             currentStopIndex = currentIndex.takeIf { it >= 0 },
             passengerOriginIndex = originIndex,
             passengerDestinationIndex = destinationIndex,
+            nextStopScheduledEpochMillis = nextStopScheduled?.toInstant()?.toEpochMilli(),
+            nextStopExpectedEpochMillis = nextStopExpected?.toInstant()?.toEpochMilli(),
+            nextStopTimeSource = nextStopSource,
             eventTimeZoneId = when (phase) {
                 PassengerPhase.ON_BOARD,
                 PassengerPhase.APPROACHING_DESTINATION,

@@ -128,9 +128,12 @@ internal fun SettingsScreen(
     state: MainUiState,
     setSmsAutoScan: (Boolean) -> Unit,
     setThemeMode: (ThemeMode) -> Unit,
+    setSmartBandSyncEnabled: (Boolean) -> Unit,
+    setSmartBandDeviceAddress: (String) -> Unit,
     refreshDiagnostics: () -> Unit,
 ) {
     val context = LocalContext.current
+    var smartBandAddress by rememberSaveable { mutableStateOf(state.smartBandSettings.deviceAddress.orEmpty()) }
     var notificationAccessEnabled by remember { mutableStateOf(isNotificationListenerEnabled(context)) }
     var liveUpdatePromotionAllowed by remember {
         mutableStateOf(
@@ -148,6 +151,9 @@ internal fun SettingsScreen(
                 context.getSystemService(android.app.NotificationManager::class.java)
                     .canPostPromotedNotifications()
         }
+    }
+    LaunchedEffect(state.smartBandSettings.deviceAddress) {
+        smartBandAddress = state.smartBandSettings.deviceAddress.orEmpty()
     }
 
     fun openNotificationSettings() {
@@ -317,6 +323,51 @@ internal fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        item {
+            Text(stringResource(R.string.smart_band_10), style = MaterialTheme.typography.headlineMedium)
+            Card(shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.smart_band_10_experimental), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.smart_band_10_body),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = smartBandAddress,
+                        onValueChange = {
+                            smartBandAddress = it
+                            setSmartBandDeviceAddress(it)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.smart_band_device_address)) },
+                        placeholder = { Text("AA:BB:CC:DD:EE:FF") },
+                    )
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.smart_band_sync), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                if (state.smartBandSettings.canSend) {
+                                    stringResource(R.string.smart_band_ready)
+                                } else {
+                                    stringResource(R.string.smart_band_setup_required)
+                                },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = state.smartBandSettings.enabled,
+                            onCheckedChange = setSmartBandSyncEnabled,
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.smart_band_gadgetbridge_setup),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

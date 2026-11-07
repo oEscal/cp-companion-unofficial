@@ -1,4 +1,4 @@
-name: Release APK
+name: Release APK and watch app
 
 on:
   push:
@@ -78,11 +78,23 @@ jobs:
           CP_RELEASE_KEY_PASSWORD: ${{ secrets.CP_RELEASE_KEY_PASSWORD }}
           CP_RELEASE_CERT_SHA256: ${{ vars.CP_RELEASE_CERT_SHA256 }}
         run: tools/build_release.sh
+      - name: Download verified watch RPK
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: smart-band-10-watch-build
+          path: dist/watch
+      - name: Add watch RPK to release bundle
+        shell: bash
+        run: |
+          rpk="$(find dist/watch -type f -name '*.rpk' -print -quit)"
+          test -n "$rpk"
+          mv "$rpk" dist/
+          find dist/watch -depth -type d -empty -delete
       - name: Package source and checksums
         env:
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
         run: python3 tools/prepare_release.py --package --check-ref "refs/tags/$RELEASE_TAG"
-      - name: Create GitHub release with APK and source
+      - name: Create GitHub release with APK, watch app, and source
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}

@@ -284,6 +284,10 @@ data class TrackingSnapshot(
     val currentStopIndex: Int? = null,
     val passengerOriginIndex: Int? = null,
     val passengerDestinationIndex: Int? = null,
+    /** The next calling-point event, when the resolver has enough structured data to expose it. */
+    val nextStopScheduledEpochMillis: Long? = null,
+    val nextStopExpectedEpochMillis: Long? = null,
+    val nextStopTimeSource: ExpectedTimeSource = ExpectedTimeSource.UNKNOWN,
     /** Time zone used to render this passenger segment consistently, even when the device is abroad. */
     val eventTimeZoneId: String = "Europe/Lisbon",
     /** Updated by the running service and used for diagnostics/recovery decisions. */

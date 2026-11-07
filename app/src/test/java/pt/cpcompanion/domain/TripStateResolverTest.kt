@@ -6,6 +6,7 @@ import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import pt.cpcompanion.model.ExpectedTimeSource
 import pt.cpcompanion.model.PassengerPhase
 import pt.cpcompanion.model.StationRef
 import pt.cpcompanion.model.Ticket
@@ -93,6 +94,21 @@ class TripStateResolverTest {
             date.atTime(21, 8).atZone(ZoneId.of("Europe/Lisbon")).toInstant().toEpochMilli(),
             snapshot.expectedEventEpochMillis,
         )
+    }
+
+    @Test
+    fun inJourneySnapshotExposesTheNextCallingPointEvent() {
+        val date = LocalDate.of(2026, 7, 11)
+        val now = date.atTime(20, 6).atZone(ZoneId.of("Europe/Lisbon")).toInstant()
+        val snapshot = resolver.resolve(ticket(date), trip(date), now)
+
+        assertEquals(PassengerPhase.ON_BOARD, snapshot.phase)
+        assertEquals("Bencanta", snapshot.nextStopName)
+        assertEquals(
+            date.atTime(20, 13).atZone(ZoneId.of("Europe/Lisbon")).toInstant().toEpochMilli(),
+            snapshot.nextStopExpectedEpochMillis,
+        )
+        assertEquals(ExpectedTimeSource.OBSERVED, snapshot.nextStopTimeSource)
     }
 
     @Test

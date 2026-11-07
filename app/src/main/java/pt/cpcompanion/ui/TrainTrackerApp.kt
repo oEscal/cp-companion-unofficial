@@ -311,6 +311,8 @@ fun TrainTrackerApp(viewModel: MainViewModel) {
                                 state = state,
                                 setSmsAutoScan = ::setSmsAutoScan,
                                 setThemeMode = viewModel::setThemeMode,
+                                setSmartBandSyncEnabled = viewModel::setSmartBandSyncEnabled,
+                                setSmartBandDeviceAddress = viewModel::setSmartBandDeviceAddress,
                                 refreshDiagnostics = viewModel::refreshDiagnostics,
                             )
                         }

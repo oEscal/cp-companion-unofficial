@@ -1,0 +1,10 @@
+<script>
+export default {
+  onCreate() {
+    console.log("CP Companion Smart Band app created")
+  },
+  onDestroy() {
+    console.log("CP Companion Smart Band app destroyed")
+  }
+}
+</script>

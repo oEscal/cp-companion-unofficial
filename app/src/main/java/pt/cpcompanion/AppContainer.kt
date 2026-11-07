@@ -8,6 +8,7 @@ import pt.cpcompanion.network.CpApiClient
 import pt.cpcompanion.network.CpRequestCoordinator
 import pt.cpcompanion.notifications.TrackingNotificationFactory
 import pt.cpcompanion.sms.SmsTicketImporter
+import pt.cpcompanion.watch.SmartBandSyncController
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -21,4 +22,5 @@ class AppContainer(context: Context) {
     val repository by lazy { TrainRepository(appContext, api) }
     val resolver by lazy { TripStateResolver() }
     val smsTicketImporter by lazy { SmsTicketImporter(appContext) }
+    val smartBandSync by lazy { SmartBandSyncController(appContext, stores) }
 }

@@ -306,4 +306,12 @@
     <string name="privacy_policy">Política de privacidade</string>
     <string name="third_party_notices">Avisos de software de terceiros</string>
     <string name="close_document">Fechar</string>
+    <string name="smart_band_10">Smart Band 10</string>
+    <string name="smart_band_10_experimental">Acompanhamento em direto experimental</string>
+    <string name="smart_band_10_body">Envie opcionalmente o painel da viagem ativa para uma Xiaomi Smart Band 10 através do Gadgetbridge. O CP Companion continua responsável por todos os dados e pelo acompanhamento do comboio.</string>
+    <string name="smart_band_device_address">Endereço Bluetooth da pulseira</string>
+    <string name="smart_band_sync">Sincronizar com a Smart Band 10</string>
+    <string name="smart_band_ready">Configurado. As atualizações só são enviadas enquanto existir uma viagem ativa.</string>
+    <string name="smart_band_setup_required">Introduza um endereço válido e conclua a configuração do Gadgetbridge antes de ativar uma sincronização útil.</string>
+    <string name="smart_band_gadgetbridge_setup">No Gadgetbridge, ative a API de Intents e “Permitir mensagens para aplicações do relógio” para esta pulseira. Um broadcast não confirma a entrega. Esta integração é experimental.</string>
 </resources>

@@ -1,0 +1,53 @@
+<template>
+  <scroll class="viewport" scroll-y="true">
+    <div class="panel">
+      <text class="title">Diagnostics</text>
+      <text class="hint">Temporary · v1</text>
+      <input class="button" type="button" value="Back to journey" onclick="close">
+      <text class="label">LAST LINK EVENT</text>
+      <text class="value">{{ report.connection }}</text>
+      <text class="detail">Open {{ report.opens }} · Close {{ report.closes }} · Error {{ report.errors }}</text>
+      <text class="label">REAL MESSAGES</text>
+      <text class="count">{{ report.received }}</text>
+      <text class="detail">Accepted {{ report.accepted }} · Rejected {{ report.rejected }}</text>
+      <text class="detail">{{ report.lastMessage }}</text>
+      <text class="hint">Only interconnect messages counted</text>
+      <text class="label">LAST ERROR / CLOSE</text>
+      <text class="detail">{{ report.lastIssue }}</text>
+      <input if="{{ linkCheckEnabled }}" class="button" type="button" value="{{ report.checking ? 'Checking...' : 'Check link' }}" onclick="check">
+      <div if="{{ linkCheckEnabled }}" class="link-check">
+        <text class="label">READY STATE</text>
+        <text class="detail">{{ report.ready }}</text>
+        <text class="label">DIAGNOSIS</text>
+        <text class="detail">{{ report.diagnosis }}</text>
+        <text class="hint">API results are not proof of journey delivery.</text>
+      </div>
+      <text if="{{ !linkCheckEnabled }}" class="hint">Link check disabled pending validation</text>
+      <text class="label">RECENT EVENTS</text>
+      <text class="detail">{{ report.history }}</text>
+      <text class="hint">Session only. Restart resets counters. No payloads saved.</text>
+      <input class="button" type="button" value="Back to journey" onclick="close">
+    </div>
+  </scroll>
+</template>
+
+<script>
+export default {
+  props: ['report', 'linkCheckEnabled'],
+  close() { this.$emit('close') },
+  check() { this.$emit('check') }
+}
+</script>
+
+<style>
+div, text, input { flex-shrink: 0; }
+.viewport { width: 106px; height: 100%; flex-direction: column; background-color: #080e0b; }
+.panel { width: 106px; padding-top: 22px; padding-bottom: 28px; flex-direction: column; align-items: center; }
+.title { width: 80px; font-size: 12px; line-height: 17px; color: #8af8c7; text-align: center; }
+.label { width: 82px; margin-top: 10px; font-size: 7px; line-height: 11px; color: #8af8c7; }
+.value { width: 82px; font-size: 12px; line-height: 17px; color: #edf6f0; }
+.count { width: 82px; font-size: 22px; line-height: 30px; color: #edf6f0; }
+.detail { width: 82px; font-size: 9px; line-height: 13px; color: #edf6f0; }
+.hint { width: 82px; margin-top: 3px; font-size: 8px; line-height: 12px; color: #a1b3a9; }
+.button { width: 80px; height: 22px; margin-top: 8px; border-radius: 11px; font-size: 9px; color: #edf6f0; background-color: #244c5c; }
+</style>

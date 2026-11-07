@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "type": "journey_snapshot",
+  "sequence": 101,
+  "sentAtEpochMs": 1793996000000,
+  "journey": {
+    "id": "session-fixture-upcoming",
+    "train": "IC 000",
+    "origin": "Coimbra-B",
+    "destination": "Lisboa Oriente",
+    "status": "in_progress",
+    "nextStop": "Pombal",
+    "countdownTarget": "next_stop",
+    "countdownEpochMs": 1793997600000,
+    "scheduledDepartureEpochMs": 1793995800000,
+    "estimatedDepartureEpochMs": 1793996400000,
+    "scheduledArrivalEpochMs": 1793999400000,
+    "estimatedArrivalEpochMs": 1794000000000,
+    "scheduledDepartureLocal": "20:10",
+    "estimatedDepartureLocal": "20:20",
+    "scheduledArrivalLocal": "21:10",
+    "estimatedArrivalLocal": "21:20",
+    "delayMinutes": 10,
+    "platform": null,
+    "timeZoneId": "Europe/Lisbon",
+    "timeSource": "estimated",
+    "lastSyncEpochMs": 1793995990000,
+    "dataStale": false
+  }
+}

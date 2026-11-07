@@ -10,6 +10,7 @@ class TrainTrackerApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container.notifications.createChannels()
+        container.smartBandSync.start()
         SmsInboxSyncScheduler.reconcileAsync(this)
         TicketAutomationReconciler.enqueue(this)
     }

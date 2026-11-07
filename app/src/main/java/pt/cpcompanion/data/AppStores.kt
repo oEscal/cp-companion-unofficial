@@ -30,6 +30,7 @@ import pt.cpcompanion.model.isClearlyPastForAutomation
 import pt.cpcompanion.model.isClearlyPastByTimeOnly
 import pt.cpcompanion.model.normalizeCarriage
 import pt.cpcompanion.model.normalizeSeat
+import pt.cpcompanion.watch.SmartBandSettings
 
 /** Result of merging an SMS/notification ticket into stable persisted ticket data. */
 data class ImportedTicketUpsertResult(
@@ -72,6 +73,9 @@ class AppStores(context: Context) {
 
     private val _favoriteStationCodes = MutableStateFlow<Set<String>>(emptySet())
     val favoriteStationCodes: StateFlow<Set<String>> = _favoriteStationCodes.asStateFlow()
+
+    private val _smartBandSettings = MutableStateFlow(SmartBandSettings())
+    val smartBandSettings: StateFlow<SmartBandSettings> = _smartBandSettings.asStateFlow()
 
     private val initialTrackingSnapshots: Map<String, TrackingSnapshot> =
         secure.get(KEY_TRACKING_SESSIONS)?.let { encoded ->
@@ -149,6 +153,9 @@ class AppStores(context: Context) {
             ?.filter(String::isNotBlank)
             ?.toSet()
             ?: emptySet()
+        val loadedSmartBand = preferenceOrLegacy(KEY_SMART_BAND, KEY_SMART_BAND)?.let {
+            runCatching { json.decodeFromString<SmartBandSettings>(it).normalized() }.getOrNull()
+        } ?: SmartBandSettings()
         val loadedFingerprints = preferenceOrLegacy(
             KEY_NOTIFICATION_IMPORT_FINGERPRINTS,
             KEY_NOTIFICATION_IMPORT_FINGERPRINTS,
@@ -159,6 +166,7 @@ class AppStores(context: Context) {
             _smsImportSettings.value = loadedSms
             _themeMode.value = loadedTheme
             _favoriteStationCodes.value = loadedFavorites
+            _smartBandSettings.value = loadedSmartBand
             processedNotificationFingerprints.clear()
             processedNotificationFingerprints.addAll(loadedFingerprints.takeLast(MAX_NOTIFICATION_FINGERPRINTS))
         }
@@ -202,6 +210,21 @@ class AppStores(context: Context) {
         }.toSet()
         _favoriteStationCodes.value = updated
         preferences.writeString(KEY_FAVORITE_STATIONS, updated.sorted().joinToString(","))
+    }
+
+    @Synchronized
+    fun saveSmartBandSettings(settings: SmartBandSettings) {
+        val normalized = settings.normalized()
+        if (normalized == _smartBandSettings.value) return
+        _smartBandSettings.value = normalized
+        preferences.writeString(KEY_SMART_BAND, json.encodeToString(normalized))
+    }
+
+    @Synchronized
+    fun updateSmartBandSettings(transform: (SmartBandSettings) -> SmartBandSettings): SmartBandSettings {
+        val updated = transform(_smartBandSettings.value)
+        saveSmartBandSettings(updated)
+        return _smartBandSettings.value
     }
 
     @Synchronized
@@ -558,6 +581,7 @@ class AppStores(context: Context) {
         const val KEY_SMS_IMPORT = "sms_import_settings"
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_FAVORITE_STATIONS = "favorite_station_codes"
+        const val KEY_SMART_BAND = "smart_band_settings"
         const val KEY_TRACKING = "tracking"
         const val KEY_TRACKING_SESSIONS = "tracking_sessions_v2"
         const val KEY_ACTIVE_TICKET = "active_ticket"

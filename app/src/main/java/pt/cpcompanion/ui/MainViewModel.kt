@@ -53,6 +53,7 @@ import pt.cpcompanion.model.shouldShowAutomationSwitch
 import pt.cpcompanion.sms.SmsImportCoordinator
 import pt.cpcompanion.sms.SmsImportResult
 import pt.cpcompanion.tracking.TrainTrackingService
+import pt.cpcompanion.watch.SmartBandSettings
 import pt.cpcompanion.worker.SmsInboxSyncScheduler
 import pt.cpcompanion.worker.TicketReminderScheduler
 import pt.cpcompanion.domain.StationTimeZoneResolver
@@ -98,6 +99,7 @@ data class MainUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val exactAlarmAllowed: Boolean = true,
     val requestCounters: Map<String, Long> = emptyMap(),
+    val smartBandSettings: SmartBandSettings = SmartBandSettings(),
 )
 
 data class MainShellState(
@@ -108,6 +110,7 @@ data class MainShellState(
     val canGoBack: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val exactAlarmAllowed: Boolean = true,
+    val smartBandSettings: SmartBandSettings = SmartBandSettings(),
 )
 
 class MainViewModel(
@@ -141,6 +144,7 @@ class MainViewModel(
                 canGoBack = current.canGoBack,
                 themeMode = current.themeMode,
                 exactAlarmAllowed = current.exactAlarmAllowed,
+                smartBandSettings = current.smartBandSettings,
             )
         }
         .distinctUntilChanged()
@@ -150,6 +154,7 @@ class MainViewModel(
             MainShellState(
                 screen = restoredScreen,
                 canGoBack = hasBackDestination(restoredScreen),
+                smartBandSettings = SmartBandSettings(),
             ),
         )
     val tracking = container.stores.tracking
@@ -202,6 +207,11 @@ class MainViewModel(
         }
         viewModelScope.launch {
             container.stores.themeMode.collectLatest { _state.value = _state.value.copy(themeMode = it) }
+        }
+        viewModelScope.launch {
+            container.stores.smartBandSettings.collectLatest {
+                _state.value = _state.value.copy(smartBandSettings = it)
+            }
         }
         refreshAutomationCapabilities()
         when (val screen = restoredScreen) {
@@ -271,6 +281,16 @@ class MainViewModel(
 
     fun setThemeMode(mode: ThemeMode) {
         container.stores.saveThemeMode(mode)
+    }
+
+    fun setSmartBandSyncEnabled(enabled: Boolean) {
+        container.stores.updateSmartBandSettings { it.copy(enabled = enabled) }
+    }
+
+    fun setSmartBandDeviceAddress(value: String) {
+        container.stores.updateSmartBandSettings {
+            it.copy(deviceAddress = value.trim().takeIf(String::isNotEmpty))
+        }
     }
 
     fun refreshDiagnostics() {

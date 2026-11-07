@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "type": "journey_cleared",
+  "sequence": 102,
+  "sentAtEpochMs": 1793997000000,
+  "journeyId": "session-fixture-upcoming"
+}

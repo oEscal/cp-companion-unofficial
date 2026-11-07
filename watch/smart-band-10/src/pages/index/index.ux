@@ -1,0 +1,270 @@
+<!-- Temporary diagnostics integration; removal checklist in diagnostics/README.md. -->
+<import name="diagnostics-panel" src="../../diagnostics/panel.ux"></import>
+<template>
+  <div class="screen">
+    <diagnostics-panel if="{{ diagnosticsOpen }}" report="{{ diagnosticsReport }}" link-check-enabled="{{ diagnosticsLinkCheckEnabled }}" onclose="closeDiagnostics" oncheck="checkDiagnostics"></diagnostics-panel>
+    <scroll if="{{ !diagnosticsOpen }}" class="viewport" scroll-y="true">
+      <div class="page">
+        <div class="header">
+          <image class="train-icon" src="/assets/ui/train.png"></image>
+          <text class="train">{{ view.hasJourney ? view.train : 'CP' }}</text>
+        </div>
+        <div class="journey" if="{{ view.hasJourney }}">
+          <div class="route">
+            <div class="station-row">
+              <div class="origin-dot"></div>
+              <text class="station origin">{{ view.origin }}</text>
+            </div>
+            <div class="route-line"></div>
+            <div class="station-row">
+              <div class="destination-dot"></div>
+              <text class="station destination">{{ view.destination }}</text>
+            </div>
+          </div>
+          <div class="hero">
+            <div class="phase {{ view.phaseTone }}">
+              <image class="small-icon" src="/assets/ui/{{ view.phaseIcon }}.png"></image>
+              <text class="phase-label">{{ view.phase }}</text>
+            </div>
+            <text class="target-label">{{ view.targetLabel }}</text>
+            <text class="countdown" style="font-size: {{ view.countdown.length > 5 ? 20 : 30 }}px;">{{ view.countdown }}</text>
+            <div class="next-station" if="{{ view.nextStation }}">
+              <image class="small-icon" src="/assets/ui/pin.png"></image>
+              <text class="next-name">{{ view.nextStation }}</text>
+            </div>
+          </div>
+          <div class="chips">
+            <div class="chip {{ view.delayTone }}" if="{{ view.hasDelay }}">
+              <image class="small-icon" src="/assets/ui/{{ view.delayIcon }}.png"></image>
+              <text class="chip-label">{{ view.delayValue }}</text>
+            </div>
+            <div class="chip platform" if="{{ view.platformValue }}">
+              <text class="chip-label">{{ view.platformValue }}</text>
+            </div>
+          </div>
+          <div class="times">
+            <div class="time-cell">
+              <div class="time-row">
+                <image class="small-icon" src="/assets/ui/depart.png"></image>
+                <text class="time">{{ view.departureTime }}</text>
+              </div>
+              <text class="source">{{ view.departureSource }}</text>
+            </div>
+            <div class="time-divider"></div>
+            <div class="time-cell">
+              <div class="time-row">
+                <image class="small-icon" src="/assets/ui/arrive.png"></image>
+                <text class="time">{{ view.arrivalTime }}</text>
+              </div>
+              <text class="source">{{ view.arrivalSource }}</text>
+            </div>
+          </div>
+        </div>
+        <div class="empty" if="{{ !view.hasJourney }}">
+          <div class="empty-icon"><image class="large-icon" src="/assets/ui/{{ view.hasJourney ? 'train' : 'link' }}.png"></image></div>
+          <text class="empty-title">{{ view.emptyTitle }}</text>
+          <text class="empty-hint">{{ view.emptyHint }}</text>
+        </div>
+        <text class="notice" if="{{ view.notice }}">{{ view.notice }}</text>
+        <div class="sync-row">
+          <image class="small-icon" src="/assets/ui/{{ view.linkIcon }}.png"></image>
+          <text class="sync">{{ view.syncTime }}</text>
+        </div>
+        <input if="{{ diagnosticsEnabled }}" class="diagnostics-button" type="button" value="Diagnostics" onclick="openDiagnostics">
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+var interconnect = require("@system.interconnect")
+var device = require("@system.device")
+var stateStore = require("../../common/state")
+var display = require("../../common/display")
+var receiver = require("../../common/receiver")
+var diagnostics = require("../../diagnostics/session")
+var diagnosticsConfig = require("../../diagnostics/config")
+
+export default {
+  private: {
+    view: display.createDisplayModel(stateStore.createState(), 0, "en"),
+    diagnosticsEnabled: diagnosticsConfig.enabled,
+    diagnosticsLinkCheckEnabled: diagnosticsConfig.linkCheckEnabled === true,
+    diagnosticsOpen: false,
+    diagnosticsReport: {}
+  },
+
+  onInit() {
+    var self = this
+    this.diagnostics = diagnostics.create({
+      enabled: diagnosticsConfig.enabled,
+      onChange: function (report) {
+        if (self.diagnosticsOpen) self.diagnosticsReport = report
+      }
+    })
+    this.model = stateStore.createState()
+    this.language = "en"
+    this.messageReceiver = receiver.createReceiver(this.model, function () {
+      self.refresh()
+    })
+    this.connect = interconnect.instance()
+    this.connect.onmessage = function (data) {
+      var result = self.receive(data && data.data !== undefined ? data.data : data)
+      self.diagnostics.record("message", null, result)
+    }
+    this.connect.onopen = function () {
+      stateStore.setConnection(self.model, "connected")
+      self.refresh()
+      self.diagnostics.record("open")
+    }
+    this.connect.onclose = function (data) {
+      stateStore.setConnection(self.model, "disconnected")
+      self.refresh()
+      self.diagnostics.record("close", data)
+    }
+    this.connect.onerror = function (data) {
+      stateStore.setConnection(self.model, "disconnected")
+      self.refresh()
+      self.diagnostics.record("error", data)
+    }
+    device.getInfo({
+      success: function (info) {
+        self.language = info && info.language && info.language.indexOf("pt") === 0 ? "pt" : "en"
+        self.refresh()
+      }
+    })
+    this.startTimer()
+    this.refresh()
+  },
+
+  onShow() {
+    this.startTimer()
+  },
+
+  onHide() {
+    if (this.diagnostics) this.diagnostics.cancelChecks()
+    if (this.tickTimer) clearInterval(this.tickTimer)
+    this.tickTimer = null
+  },
+
+  onDestroy() {
+    this.onHide()
+    if (this.diagnostics) this.diagnostics.dispose()
+  },
+
+  // BEGIN temporary diagnostics controls (no navigation or journey reset).
+  openDiagnostics() {
+    if (!this.diagnosticsEnabled) return
+    this.diagnosticsReport = this.diagnostics.snapshot()
+    this.diagnosticsOpen = true
+  },
+
+  closeDiagnostics() {
+    this.diagnostics.cancelChecks()
+    this.diagnosticsOpen = false
+  },
+
+  checkDiagnostics() {
+    if (!this.diagnosticsLinkCheckEnabled) return
+    this.diagnostics.check(this.connect)
+  },
+  // END temporary diagnostics controls.
+
+  receive(raw) {
+    return this.messageReceiver(raw)
+  },
+
+  refresh() {
+    this.view = display.createDisplayModel(this.model, Date.now(), this.language)
+  },
+
+  startTimer() {
+    var self = this
+    if (this.tickTimer) return
+    this.tickTimer = setInterval(function () {
+      self.refresh()
+    }, 30000)
+  }
+}
+</script>
+
+<style>
+/* Vela defaults flex-shrink to 1. The scroll content must retain its natural
+   height, including multiline station names and font ascenders/descenders. */
+div, text, image, input {
+  flex-shrink: 0;
+}
+.screen {
+  width: 106px;
+  height: 100%;
+  background-color: #080e0b;
+}
+.viewport {
+  width: 106px;
+  height: 100%;
+  flex-direction: column;
+}
+.page {
+  width: 106px;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+  padding-bottom: 26px;
+}
+.header {
+  width: 74px;
+  min-height: 16px;
+  align-items: center;
+  justify-content: center;
+}
+.train-icon { width: 12px; height: 12px; margin-right: 4px; }
+.train { max-width: 58px; color: #8af8c7; font-size: 12px; line-height: 16px; font-weight: bold; text-align: center; }
+.journey { width: 90px; flex-direction: column; align-items: center; }
+.route { width: 86px; margin-top: 7px; flex-direction: column; }
+.station-row { width: 86px; align-items: center; }
+.origin-dot { width: 4px; height: 4px; border-radius: 2px; border-width: 1px; border-color: #8baba0; margin-right: 5px; }
+.destination-dot { width: 4px; height: 4px; border-radius: 2px; background-color: #6ddbaa; margin-right: 5px; }
+.route-line { width: 1px; height: 4px; background-color: #355346; margin-left: 1px; }
+.station { width: 77px; font-size: 10px; line-height: 14px; }
+.origin { color: #a1b3a9; }
+.destination { color: #edf6f0; font-weight: bold; }
+.hero {
+  width: 90px;
+  margin-top: 8px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-radius: 12px;
+  background-color: #14251d;
+  flex-direction: column;
+  align-items: center;
+}
+.phase { padding-left: 6px; padding-right: 6px; height: 17px; border-radius: 9px; align-items: center; justify-content: center; }
+.small-icon { width: 9px; height: 9px; margin-right: 3px; }
+.phase-label { color: #f1f7f3; font-size: 8px; }
+.green { background-color: #23523f; }
+.blue { background-color: #244c5c; }
+.danger { background-color: #73382f; }
+.target-label { margin-top: 6px; color: #a4c4b4; font-size: 7px; line-height: 11px; }
+.countdown { width: 80px; color: #f3fff7; font-size: 30px; font-weight: bold; height: 42px; line-height: 42px; text-align: center; }
+.next-station { width: 80px; justify-content: center; align-items: center; margin-top: 2px; }
+.next-name { width: 66px; color: #bdebd3; font-size: 9px; line-height: 13px; text-align: center; }
+.chips { width: 90px; height: 25px; margin-top: 6px; justify-content: center; }
+.chip { width: 54px; height: 19px; margin-left: 2px; margin-right: 2px; border-radius: 10px; align-items: center; justify-content: center; }
+.chip-label { color: #f1f7f3; font-size: 8px; }
+.platform { width: 28px; background-color: #354b40; }
+.times { width: 90px; padding-top: 5px; padding-bottom: 5px; align-items: center; border-radius: 8px; background-color: #141e18; }
+.time-cell { width: 44px; flex-direction: column; align-items: center; }
+.time-row { align-items: center; justify-content: center; }
+.time { color: #edf6f0; font-size: 10px; font-weight: bold; }
+.time-divider { width: 1px; height: 22px; background-color: #304238; }
+.source { color: #a0b3a7; font-size: 7px; margin-top: 3px; }
+.sync-row { margin-top: 7px; height: 12px; align-items: center; justify-content: center; }
+.sync { color: #94b09f; font-size: 8px; }
+.diagnostics-button { width: 70px; height: 18px; margin-top: 4px; border-radius: 9px; background-color: #1c3025; color: #b2cdbd; font-size: 8px; }
+.notice { width: 84px; margin-top: 6px; color: #ffb4ab; font-size: 9px; text-align: center; }
+.empty { width: 86px; padding-top: 24px; padding-bottom: 24px; flex-direction: column; align-items: center; }
+.empty-icon { width: 38px; height: 38px; border-radius: 19px; background-color: #23523f; justify-content: center; align-items: center; }
+.large-icon { width: 22px; height: 22px; }
+.empty-title { width: 82px; color: #edf6f0; font-size: 14px; font-weight: bold; text-align: center; margin-top: 12px; }
+.empty-hint { width: 82px; color: #a1b3a9; font-size: 10px; text-align: center; margin-top: 8px; }
+</style>
