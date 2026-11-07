@@ -44,77 +44,77 @@ androidx.collection:collection-ktx:1.5.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
 Metadata: https://dl.google.com/dl/android/maven2/androidx/collection/collection-ktx/1.5.0/collection-ktx-1.5.0.pom
 
-androidx.compose.animation:animation-android:1.12.0-beta01
+androidx.compose.animation:animation-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-android/1.12.0-beta01/animation-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-android/1.13.0-alpha01/animation-android-1.13.0-alpha01.pom
 
-androidx.compose.animation:animation-core-android:1.12.0-beta01
+androidx.compose.animation:animation-core-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-core-android/1.12.0-beta01/animation-core-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-core-android/1.13.0-alpha01/animation-core-android-1.13.0-alpha01.pom
 
-androidx.compose.foundation:foundation-android:1.12.0-beta01
+androidx.compose.foundation:foundation-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-android/1.12.0-beta01/foundation-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-android/1.13.0-alpha01/foundation-android-1.13.0-alpha01.pom
 
-androidx.compose.foundation:foundation-layout-android:1.12.0-beta01
+androidx.compose.foundation:foundation-layout-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-layout-android/1.12.0-beta01/foundation-layout-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-layout-android/1.13.0-alpha01/foundation-layout-android-1.13.0-alpha01.pom
 
-androidx.compose.material3:material3-android:1.5.0-alpha24
+androidx.compose.material3:material3-android:1.5.0-alpha29
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.5.0-alpha24/material3-android-1.5.0-alpha24.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.5.0-alpha29/material3-android-1.5.0-alpha29.pom
 
-androidx.compose.material3:material3-ripple-android:1.5.0-alpha24
+androidx.compose.material3:material3-ripple-android:1.5.0-alpha29
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-ripple-android/1.5.0-alpha24/material3-ripple-android-1.5.0-alpha24.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-ripple-android/1.5.0-alpha29/material3-ripple-android-1.5.0-alpha29.pom
 
-androidx.compose.material:material-ripple-android:1.12.0-beta01
+androidx.compose.material:material-ripple-android:1.12.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/material/material-ripple-android/1.12.0-beta01/material-ripple-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/material/material-ripple-android/1.12.0/material-ripple-android-1.12.0.pom
 
-androidx.compose.runtime:runtime-android:1.12.0-beta01
+androidx.compose.runtime:runtime-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-android/1.12.0-beta01/runtime-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-android/1.13.0-alpha01/runtime-android-1.13.0-alpha01.pom
 
-androidx.compose.runtime:runtime-annotation-android:1.12.0-beta01
+androidx.compose.runtime:runtime-annotation-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-android/1.12.0-beta01/runtime-annotation-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-android/1.13.0-alpha01/runtime-annotation-android-1.13.0-alpha01.pom
 
-androidx.compose.runtime:runtime-retain-android:1.12.0-beta01
+androidx.compose.runtime:runtime-retain-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-android/1.12.0-beta01/runtime-retain-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-android/1.13.0-alpha01/runtime-retain-android-1.13.0-alpha01.pom
 
-androidx.compose.runtime:runtime-saveable-android:1.12.0-beta01
+androidx.compose.runtime:runtime-saveable-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-android/1.12.0-beta01/runtime-saveable-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-android/1.13.0-alpha01/runtime-saveable-android-1.13.0-alpha01.pom
 
-androidx.compose.ui:ui-android:1.12.0-beta01
+androidx.compose.ui:ui-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.12.0-beta01/ui-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.13.0-alpha01/ui-android-1.13.0-alpha01.pom
 
-androidx.compose.ui:ui-geometry-android:1.12.0-beta01
+androidx.compose.ui:ui-geometry-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-geometry-android/1.12.0-beta01/ui-geometry-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-geometry-android/1.13.0-alpha01/ui-geometry-android-1.13.0-alpha01.pom
 
-androidx.compose.ui:ui-graphics-android:1.12.0-beta01
+androidx.compose.ui:ui-graphics-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-graphics-android/1.12.0-beta01/ui-graphics-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-graphics-android/1.13.0-alpha01/ui-graphics-android-1.13.0-alpha01.pom
 
-androidx.compose.ui:ui-text-android:1.12.0-beta01
+androidx.compose.ui:ui-text-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-text-android/1.12.0-beta01/ui-text-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-text-android/1.13.0-alpha01/ui-text-android-1.13.0-alpha01.pom
 
-androidx.compose.ui:ui-tooling-preview-android:1.12.0-beta01
+androidx.compose.ui:ui-tooling-preview-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-tooling-preview-android/1.12.0-beta01/ui-tooling-preview-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-tooling-preview-android/1.13.0-alpha01/ui-tooling-preview-android-1.13.0-alpha01.pom
 
-androidx.compose.ui:ui-unit-android:1.12.0-beta01
+androidx.compose.ui:ui-unit-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-unit-android/1.12.0-beta01/ui-unit-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-unit-android/1.13.0-alpha01/ui-unit-android-1.13.0-alpha01.pom
 
-androidx.compose.ui:ui-util-android:1.12.0-beta01
+androidx.compose.ui:ui-util-android:1.13.0-alpha01
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
-Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-util-android/1.12.0-beta01/ui-util-android-1.12.0-beta01.pom
+Metadata: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-util-android/1.13.0-alpha01/ui-util-android-1.13.0-alpha01.pom
 
 androidx.concurrent:concurrent-futures-ktx:1.3.0
 The Apache Software License, Version 2.0 — http://www.apache.org/licenses/LICENSE-2.0.txt
@@ -385,24 +385,24 @@ androidx.annotation:annotation-experimental:1.5.0 / META-INF/androidx/annotation
 androidx.annotation:annotation-jvm:1.10.0 / META-INF/androidx/annotation/annotation/LICENSE.txt
 androidx.collection:collection-jvm:1.5.0 / META-INF/androidx/collection/collection/LICENSE.txt
 androidx.collection:collection-ktx:1.5.0 / META-INF/androidx/collection/collection-ktx/LICENSE.txt
-androidx.compose.animation:animation-android:1.12.0-beta01 / META-INF/androidx/compose/animation/animation/LICENSE.txt
-androidx.compose.animation:animation-core-android:1.12.0-beta01 / META-INF/androidx/compose/animation/animation-core/LICENSE.txt
-androidx.compose.foundation:foundation-android:1.12.0-beta01 / META-INF/androidx/compose/foundation/foundation/LICENSE.txt
-androidx.compose.foundation:foundation-layout-android:1.12.0-beta01 / META-INF/androidx/compose/foundation/foundation-layout/LICENSE.txt
-androidx.compose.material3:material3-android:1.5.0-alpha24 / META-INF/androidx/compose/material3/material3/LICENSE.txt
-androidx.compose.material3:material3-ripple-android:1.5.0-alpha24 / META-INF/androidx/compose/material3/material3-ripple/LICENSE.txt
-androidx.compose.material:material-ripple-android:1.12.0-beta01 / META-INF/androidx/compose/material/material-ripple/LICENSE.txt
-androidx.compose.runtime:runtime-android:1.12.0-beta01 / META-INF/androidx/compose/runtime/runtime/LICENSE.txt
-androidx.compose.runtime:runtime-annotation-android:1.12.0-beta01 / META-INF/androidx/compose/runtime/runtime-annotation/LICENSE.txt
-androidx.compose.runtime:runtime-retain-android:1.12.0-beta01 / META-INF/androidx/compose/runtime/runtime-retain/LICENSE.txt
-androidx.compose.runtime:runtime-saveable-android:1.12.0-beta01 / META-INF/androidx/compose/runtime/runtime-saveable/LICENSE.txt
-androidx.compose.ui:ui-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui/LICENSE.txt
-androidx.compose.ui:ui-geometry-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui-geometry/LICENSE.txt
-androidx.compose.ui:ui-graphics-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui-graphics/LICENSE.txt
-androidx.compose.ui:ui-text-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui-text/LICENSE.txt
-androidx.compose.ui:ui-tooling-preview-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui-tooling-preview/LICENSE.txt
-androidx.compose.ui:ui-unit-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui-unit/LICENSE.txt
-androidx.compose.ui:ui-util-android:1.12.0-beta01 / META-INF/androidx/compose/ui/ui-util/LICENSE.txt
+androidx.compose.animation:animation-android:1.13.0-alpha01 / META-INF/androidx/compose/animation/animation/LICENSE.txt
+androidx.compose.animation:animation-core-android:1.13.0-alpha01 / META-INF/androidx/compose/animation/animation-core/LICENSE.txt
+androidx.compose.foundation:foundation-android:1.13.0-alpha01 / META-INF/androidx/compose/foundation/foundation/LICENSE.txt
+androidx.compose.foundation:foundation-layout-android:1.13.0-alpha01 / META-INF/androidx/compose/foundation/foundation-layout/LICENSE.txt
+androidx.compose.material3:material3-android:1.5.0-alpha29 / META-INF/androidx/compose/material3/material3/LICENSE.txt
+androidx.compose.material3:material3-ripple-android:1.5.0-alpha29 / META-INF/androidx/compose/material3/material3-ripple/LICENSE.txt
+androidx.compose.material:material-ripple-android:1.12.0 / META-INF/androidx/compose/material/material-ripple/LICENSE.txt
+androidx.compose.runtime:runtime-android:1.13.0-alpha01 / META-INF/androidx/compose/runtime/runtime/LICENSE.txt
+androidx.compose.runtime:runtime-annotation-android:1.13.0-alpha01 / META-INF/androidx/compose/runtime/runtime-annotation/LICENSE.txt
+androidx.compose.runtime:runtime-retain-android:1.13.0-alpha01 / META-INF/androidx/compose/runtime/runtime-retain/LICENSE.txt
+androidx.compose.runtime:runtime-saveable-android:1.13.0-alpha01 / META-INF/androidx/compose/runtime/runtime-saveable/LICENSE.txt
+androidx.compose.ui:ui-android:1.13.0-alpha01 / META-INF/androidx/compose/ui/ui/LICENSE.txt
+androidx.compose.ui:ui-geometry-android:1.13.0-alpha01 / META-INF/androidx/compose/ui/ui-geometry/LICENSE.txt
+androidx.compose.ui:ui-graphics-android:1.13.0-alpha01 / META-INF/androidx/compose/ui/ui-graphics/LICENSE.txt
+androidx.compose.ui:ui-text-android:1.13.0-alpha01 / META-INF/androidx/compose/ui/ui-text/LICENSE.txt
+androidx.compose.ui:ui-tooling-preview-android:1.13.0-alpha01 / META-INF/androidx/compose/ui/ui-tooling-preview/LICENSE.txt
+androidx.compose.ui:ui-unit-android:1.13.0-alpha01 / META-INF/androidx/compose/ui/ui-unit/LICENSE.txt
+androidx.compose.ui:ui-util-android:1.13.0-alpha01 / META-INF/androidx/compose/ui/ui-util/LICENSE.txt
 androidx.concurrent:concurrent-futures-ktx:1.3.0 / META-INF/androidx/concurrent/concurrent-futures-ktx/LICENSE.txt
 androidx.concurrent:concurrent-futures:1.3.0 / META-INF/androidx/concurrent/concurrent-futures/LICENSE.txt
 androidx.core:core-ktx:1.19.0 / META-INF/androidx/core/core-ktx/LICENSE.txt

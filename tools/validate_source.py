@@ -150,7 +150,7 @@ def check_project_invariants() -> None:
         "backup disabled": 'android:allowBackup="false"',
         "cleartext disabled in manifest": 'android:usesCleartextTraffic="false"',
         "cleartext disabled in network policy": 'cleartextTrafficPermitted="false"',
-        "Material 3 Expressive dependency": 'material3 = "1.5.0-alpha24"',
+        "Material 3 Expressive dependency": 'material3 = "1.5.0-alpha29"',
         "version code": "versionCode = 10",
         "version name": 'versionName = "1.0.0"',
         "versioned user agent": 'USER_AGENT = "CP-Companion-Android/1.0.0"',
